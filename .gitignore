@@ -1,0 +1,29 @@
+# Code only: everything is ignored unless listed below, so sample folders (images, tracks,
+# test_config.json, scale_calibration.json), comparisons/, .venv/ and decks never enter the repository.
+/*
+
+!/.gitignore
+!/README.md
+!/NEW_TEST_UBUNTU.md
+!/CLAUDE.md
+!/requirements.txt
+!/analysis_settings.json
+!/run_pipeline.sh
+
+# code folders: Python and Markdown files only
+!/strain_tracking/
+/strain_tracking/*
+!/strain_tracking/*.py
+!/strain_tracking/*.md
+!/constitutive_fit/
+/constitutive_fit/*
+!/constitutive_fit/*.py
+!/constitutive_fit/*.md
+!/thickness/
+/thickness/*
+!/thickness/*.py
+!/thickness/*.md
+
+__pycache__/
+*.pyc
+.DS_Store

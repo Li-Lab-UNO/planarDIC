@@ -1,0 +1,16 @@
+{
+  "target_px_per_mm": 50.0,
+  "subset_mm": 1.0,
+  "step_mm": 0.2,
+  "window_mm": 1.5,
+  "edge_mm": {
+    "z": 1.5,
+    "theta": 2.0
+  },
+  "low_spot_box_mm": [
+    3.0,
+    2.0
+  ],
+  "note": "Physical sizes shared by every sample and test. Images are resampled (area averaging, downsampling only) to target_px_per_mm before tracking, so subset_mm and step_mm are the same px everywhere. Effective strain resolution ~ sqrt(window_mm^2 + subset_mm^2).",
+  "edge_note": "Interior for J/mean, spread and low spot: at least edge_mm.z from the left/right (axial) tine-tip lines and edge_mm.theta from the top/bottom (circumferential) ones. User-set: edit here, or pass --edge-mm Z THETA to peak_j_figure.py / compare_peak_j.py for one run. edge_effects.py reports where the tine-pitch modulation fades against these values."
+}
