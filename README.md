@@ -128,12 +128,21 @@ Runs every tracking step for the tests given, in order, with one log per step:
 ./run_pipeline.sh --dry-run N1739
 ```
 
+Each computer's defaults live in its settings file: `pipeline.mac.ini` on macOS and
+`pipeline.ubuntu.ini` on Linux (tests, steps, jobs, deformations, status interval, loading-only,
+confirmation). `run_pipeline.sh` picks the file from the operating system; both are tracked by git, so
+they can be edited on either computer and committed like code. Options on the command line override it
+for one run (`--full-cycle` and `--ask` undo `loading_only = yes` and `yes = yes`); without tests on the
+command line, its `tests` are run. `--config FILE` reads another settings file.
+
 A bare sample name (`N1739`) runs all its tests. The script prints the plan and asks before
 starting (`--yes` skips the question), writes each test's logs to `<test folder>/pipeline_logs/run_<date>_<time>/` (one file per step, plus
 `pipeline.log` with everything the script printed; the cross-test steps log to `comparisons/pipeline_logs/`), skips the later
 steps of a test whose step failed, and prints a summary. `--jobs` sets how many tracking or export
 jobs run at once (default: CPU count − 1); `--defs` and `--export-defs` choose the deformations;
-`--setup` builds `.venv` first. `./run_pipeline.sh --help` lists every option. Tracking takes most
+`--setup` builds `.venv` first. `./run_pipeline.sh --help` lists every option. The parallel jobs share
+the CPUs: each job uses (CPU count ÷ jobs) OpenCV threads (`DIC_CV_THREADS`; OpenCV would otherwise
+start one thread per CPU in every job), and one thread for NumPy's linear algebra. Tracking takes most
 of the time: roughly 5–30 min per deformation, depending on its frame count and the machine.
 
 `--loading-only` tracks each deformation only to the end of loading (the logged Recover start + 2 s),

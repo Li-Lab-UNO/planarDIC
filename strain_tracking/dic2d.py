@@ -33,6 +33,11 @@ import numpy as np
 from scipy import ndimage
 from scipy.spatial import cKDTree
 
+# OpenCV starts one thread per logical CPU by default; parallel jobs (run_pipeline.sh) share the CPUs
+# through DIC_CV_THREADS. (macOS builds use Grand Central Dispatch, which only honors 0 = no threading.)
+if os.environ.get("DIC_CV_THREADS", "").isdigit():
+    cv2.setNumThreads(int(os.environ["DIC_CV_THREADS"]))
+
 FNAME_RE = re.compile(r"\.(\d{6})\.(\d{3})\.jpg$")
 
 # Specimen axes. Image x (tester X) is the artery's axial direction z, increasing to the

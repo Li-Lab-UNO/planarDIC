@@ -31,7 +31,11 @@ LOADING_ONLY=""
 
 usage() {
   cat <<EOF
-Usage: ./run_pipeline.sh [options] TEST...
+Usage: ./run_pipeline.sh [options] [TEST...]
+
+Defaults come from this computer's settings file, pipeline.mac.ini on macOS and pipeline.ubuntu.ini on
+Linux (both tracked by git); options given here override it for one run. Without TEST, the tests listed
+in the settings file are run.
 
 TEST is SAMPLE/testN (e.g. N1739/test1) or a whole sample (e.g. N1739 = all its tests). Each part is
 any unique prefix of the folder name, as for --test in the scripts.
@@ -54,9 +58,10 @@ Steps (in this order; --steps picks a subset, comma separated):
 Options:
   -s, --steps LIST         steps to run (default: all)
   -j, --jobs N             parallel tracking / export jobs (default: CPU count - 1 = $JOBS)
-  -d, --defs LIST          deformations to track (default: Def11-Def19)
+  -d, --defs LIST          deformations to track, e.g. Def11,Def12 or Def11-Def15 (default: Def11-Def19)
       --loading-only       track each deformation to the end of loading only (about 55% of the frames;
                            the loading frames are the same as in a full-cycle track)
+      --full-cycle         track the full load-unload cycle (overrides loading_only = yes)
       --status N           while tracking, print the progress of the running deformations every N s
                            (default: 1; 0 turns it off)
   -e, --export-defs LIST   deformations to export (default: Def11)
@@ -65,6 +70,8 @@ Options:
       --setup              build .venv from requirements.txt first (needs python3 and python3-venv)
   -n, --dry-run            print the commands only
   -y, --yes                don't ask for confirmation
+      --ask                ask for confirmation (overrides yes = yes)
+      --config FILE        read the settings from FILE instead of pipeline.mac.ini / pipeline.ubuntu.ini
   -h, --help               this help
 
 A failed sort, config, scale, widths or tracking step skips that test's later steps; a failed figure or
@@ -73,25 +80,90 @@ export doesn't. Logs: <test folder>/pipeline_logs/run_<date>_<time>/, one file p
 EOF
 }
 
+# ---- settings file: built-in defaults < pipeline.mac.ini / pipeline.ubuntu.ini < command line ----------------------------------------
+# expand_defs LIST: "Def11-Def19" -> "Def11 Def12 ... Def19"; commas -> spaces
+expand_defs() {
+  local out="" d
+  for d in ${1//,/ }; do
+    if [[ "$d" =~ ^[Dd]ef([0-9]+)-[Dd]ef([0-9]+)$ ]]; then
+      for ((i = 10#${BASH_REMATCH[1]}; i <= 10#${BASH_REMATCH[2]}; i++)); do out+=" $(printf 'Def%02d' "$i")"; done
+    else out+=" $d"; fi
+  done
+  echo "${out# }"
+}
+yesno() {   # yesno FILE LINE KEY VALUE -> 1 / 0
+  case "$(echo "$4" | tr '[:upper:]' '[:lower:]')" in
+    yes|y|true|on|1) echo 1 ;; no|n|false|off|0) echo 0 ;;
+    *) echo "$1 line $2: $3 must be yes or no, not '$4'" >&2; exit 2 ;;
+  esac
+}
+CONF_TESTS=()
+read_config() {
+  local f="$1" line key val n=0
+  while IFS= read -r line || [ -n "$line" ]; do
+    n=$((n + 1))
+    [[ "$line" =~ ^[[:space:]]*\; ]] && continue                # ; comment line (INI style)
+    [[ "$line" =~ ^[[:space:]]*\[.*\][[:space:]]*$ ]] && continue  # [section] headers are ignored
+    line="${line%%#*}"
+    [[ "$line" =~ ^[[:space:]]*$ ]] && continue
+    [[ "$line" == *=* ]] || { echo "$f line $n: expected 'key = value'"; exit 2; }
+    key=$(echo "${line%%=*}" | tr -d '[:space:]')
+    val=$(echo "${line#*=}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+    [ -z "$val" ] && continue                                  # empty: keep the built-in default
+    case "$key" in
+      tests) read -r -a CONF_TESTS <<< "${val//,/ }" ;;
+      steps) STEPS="${val//,/ }" ;;
+      jobs) if [ "$val" != auto ]; then
+              [[ "$val" =~ ^[0-9]+$ ]] && [ "$val" -gt 0 ] || { echo "$f line $n: jobs must be auto or a number"; exit 2; }
+              JOBS="$val"
+            fi ;;
+      defs) DEFS="$(expand_defs "$val")" ;;
+      export_defs) EXPORT_DEFS="$(expand_defs "$val")" ;;
+      status) [[ "$val" =~ ^[0-9]+$ ]] || { echo "$f line $n: status must be a number of seconds"; exit 2; }
+              STATUS_EVERY="$val" ;;
+      loading_only) v=$(yesno "$f" "$n" "$key" "$val") || exit 2
+                    if [ "$v" = 1 ]; then LOADING_ONLY="--loading-only"; else LOADING_ONLY=""; fi ;;
+      yes) YES="$(yesno "$f" "$n" "$key" "$val")" || exit 2 ;;
+      label) LABEL="$val" ;;
+      python) case "$val" in /*) PY="$val" ;; *) PY="$HERE/$val" ;; esac ;;
+      *) echo "$f line $n: unknown setting '$key' (see pipeline.mac.ini or pipeline.ubuntu.ini)"; exit 2 ;;
+    esac
+  done < "$f"
+}
+case "$(uname -s)" in                         # this computer's settings file
+  Darwin) CONF="$HERE/pipeline.mac.ini" ;;
+  Linux) CONF="$HERE/pipeline.ubuntu.ini" ;;
+  *) CONF="" ;;
+esac
+for ((i = 1; i <= $#; i++)); do              # --config FILE is read before the other options
+  if [ "${!i}" = "--config" ]; then j=$((i + 1)); CONF="${!j}"; fi
+done
+[ -n "$CONF" ] || { echo "no settings file for $(uname -s); give one with --config FILE"; exit 2; }
+if [ -e "$CONF" ]; then read_config "$CONF"; else echo "settings file $CONF not found"; exit 2; fi
+
 TESTS=()
 while [ $# -gt 0 ]; do
   case "$1" in
+    --config) shift 2 ;;
     -s|--steps) STEPS="${2//,/ }"; shift 2 ;;
     -j|--jobs) JOBS="$2"; shift 2 ;;
-    -d|--defs) DEFS="${2//,/ }"; shift 2 ;;
+    -d|--defs) DEFS="$(expand_defs "$2")"; shift 2 ;;
     --status) STATUS_EVERY="$2"; shift 2 ;;
     --loading-only) LOADING_ONLY="--loading-only"; shift ;;
-    -e|--export-defs) EXPORT_DEFS="${2//,/ }"; shift 2 ;;
+    --full-cycle) LOADING_ONLY=""; shift ;;
+    -e|--export-defs) EXPORT_DEFS="$(expand_defs "$2")"; shift 2 ;;
     -l|--label) LABEL="$2"; shift 2 ;;
     -p|--python) PY="$2"; shift 2 ;;
     --setup) SETUP=1; shift ;;
     -n|--dry-run) DRY=1; shift ;;
     -y|--yes) YES=1; shift ;;
+    --ask) YES=0; shift ;;
     -h|--help) usage; exit 0 ;;
     -*) echo "unknown option $1 (see --help)"; exit 2 ;;
     *) TESTS+=("$1"); shift ;;
   esac
 done
+[ ${#TESTS[@]} -eq 0 ] && TESTS=("${CONF_TESTS[@]+"${CONF_TESTS[@]}"}")   # no tests given: the settings file's
 
 for s in $STEPS; do
   case " $ALL_STEPS " in *" $s "*) ;; *) echo "unknown step '$s'; steps are: $ALL_STEPS"; exit 2 ;; esac
@@ -110,7 +182,7 @@ if [ "$SETUP" = 1 ]; then
   [ ${#TESTS[@]} -eq 0 ] && { echo "environment ready"; exit 0; }
 fi
 
-[ ${#TESTS[@]} -eq 0 ] && { usage; exit 2; }
+[ ${#TESTS[@]} -eq 0 ] && { echo "no tests: give them on the command line or set 'tests' in ${CONF#$HERE/} (--help for all options)"; exit 2; }
 if [ "$DRY" = 0 ]; then
   [ -x "$PY" ] || { echo "$PY not found: run ./run_pipeline.sh --setup first"; exit 1; }
   "$PY" - <<'EOF' || exit 1
@@ -160,8 +232,9 @@ tlogdir() {
 }
 ndefs=$(echo $DEFS | wc -w | tr -d ' ')
 echo "Tests:   ${TESTS[*]}"
+echo "Config:  ${CONF#$HERE/}"
 echo "Steps:   $STEPS"
-has track && echo "Track:   $DEFS ($(( ${#TESTS[@]} * ndefs )) deformations, $JOBS at a time${LOADING_ONLY:+, loading branch only})"
+has track && echo "Track:   $DEFS ($(( ${#TESTS[@]} * ndefs )) deformations, $JOBS at a time, $(( NCPU / JOBS > 1 ? NCPU / JOBS : 1 )) OpenCV threads each${LOADING_ONLY:+, loading branch only})"
 has exports && echo "Exports: $EXPORT_DEFS"
 echo "Python:  $PY"
 [ "$DRY" = 1 ] && echo "(dry run: commands are printed, not run)"
@@ -179,7 +252,10 @@ if [ "$DRY" = 0 ]; then
 fi
 # each tracking job writes a progress line to its log this often, so the status line can be as current
 DIC_PROGRESS_EVERY=$(( STATUS_EVERY > 0 && STATUS_EVERY < 10 ? STATUS_EVERY : 10 ))
-export DIC_PROGRESS=lines DIC_PROGRESS_EVERY PY DRY HERE STAMP STATE LOADING_ONLY
+# OpenCV threads per job: the CPUs shared among the parallel jobs (OpenCV would otherwise start one thread
+# per CPU in every job, e.g. 64 x 4 on a 64-thread machine running 4 jobs)
+DIC_CV_THREADS=$(( NCPU / JOBS > 1 ? NCPU / JOBS : 1 ))
+export DIC_PROGRESS=lines DIC_PROGRESS_EVERY DIC_CV_THREADS PY DRY HERE STAMP STATE LOADING_ONLY
 export -f tlogdir
 
 # run NAME TEST CMD...: run one command with its own log in TEST's log folder (TEST empty: a cross-test step).
