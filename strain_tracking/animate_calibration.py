@@ -13,7 +13,6 @@ from that line vs rake force.
 Output: <test>/Images/<Def>/strain_results/scale_calibration_<pair>.mp4
 """
 import argparse
-import glob
 import json
 import os
 import sys

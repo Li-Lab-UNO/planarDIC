@@ -33,7 +33,6 @@ Outputs: Images/constitutive_fit/stretch_inputs/
 """
 import argparse
 import glob
-import json
 import os
 import re
 import sys

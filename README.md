@@ -12,8 +12,9 @@ others, and the code finds it automatically.
 ## Layout
 
 ```
-DIC/
+planarDIC/
 ├── run_pipeline.sh         the pipeline in one command
+├── pipeline.mac.ini, pipeline.ubuntu.ini   run_pipeline.sh defaults for each computer
 ├── analysis_settings.json  physical sizes shared by every test (subset, grid step, strain window, ...)
 ├── requirements.txt        Python packages (.venv)
 ├── NEW_TEST_UBUNTU.md      a new test, step by step, on Ubuntu
@@ -139,13 +140,16 @@ A bare sample name (`N1739`) runs all its tests. The script prints the plan and 
 starting (`--yes` skips the question), writes each test's logs to `<test folder>/pipeline_logs/run_<date>_<time>/` (one file per step, plus
 `pipeline.log` with everything the script printed; the cross-test steps log to `comparisons/pipeline_logs/`), skips the later
 steps of a test whose step failed, and prints a summary. `--jobs` sets how many tracking or export
-jobs run at once (default: CPU count − 1); `--defs` and `--export-defs` choose the deformations;
+jobs run at once (default: `jobs` in the settings file; `auto` = CPU count − 1); `--defs` and
+`--export-defs` choose the deformations;
 `--setup` builds `.venv` first. `./run_pipeline.sh --help` lists every option. The parallel jobs share
 the CPUs: each job gets (CPU count ÷ jobs) threads (`DIC_THREADS`), matches chunks of its subsets in
 parallel on them and reads the next image while matching; OpenCV's and NumPy's own threading are limited
 to match. A script run on its own uses every CPU. The subsets are matched independently, so the results
-do not depend on the thread count. Tracking takes most
-of the time: roughly 5–30 min per deformation, depending on its frame count and the machine.
+do not depend on the thread count (results from two computers agree to within rounding, far below
+the DIC noise, but are not bit-identical). Tracking takes most of the time: with the nine deformations of
+a test running at once, a 380-frame deformation takes about 7 min on an M4 Mac (10 cores) and about
+4 min on a Threadripper 7970X (32 cores), so a whole test takes about as long as its longest deformation.
 
 `--loading-only` tracks each deformation only to the end of loading (the logged Recover start + 2 s),
 about 55% of the frames. The fits use only the loading branch, and tracking runs forward, so the

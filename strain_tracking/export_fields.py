@@ -36,7 +36,6 @@ direction theta increases UPWARD in the image (theta = -image y; dic2d.THETA_SIG
     times, frame_files, axis_convention, subset_px, step_px, strain_window
 """
 import argparse
-import glob
 import os
 import sys
 

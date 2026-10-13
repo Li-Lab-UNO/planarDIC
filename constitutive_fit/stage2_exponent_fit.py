@@ -34,7 +34,7 @@ sys.path.insert(1, os.path.join(os.path.dirname(HERE), "strain_tracking"))
 import baseline as B  # noqa: E402
 import constitutive as M  # noqa: E402
 from stage2_setup import LOCAL, assemble, geometry, measured_positions, window_F  # noqa: E402
-from stage2_synthetic import difference_matrix, neighbor_pairs  # noqa: E402
+from stage2_synthetic import neighbor_pairs  # noqa: E402
 
 EXPS = {"fiber": (4, 6), "all": (2, 4, 6)}
 LEVELS = np.round(np.arange(0.4, 2.01, 0.1), 2)

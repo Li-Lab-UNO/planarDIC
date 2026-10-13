@@ -36,7 +36,6 @@ Output: <test>/test_config.json (or --out) and <test>/Images/<Def11>/strain_resu
 """
 import argparse
 import glob
-import json
 import os
 import re
 import sys

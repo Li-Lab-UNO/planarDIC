@@ -16,7 +16,8 @@ Method
   plane fit of displacement over a square strain window -> F = I + grad(u)
   -> Green-Lagrange E = 0.5 (F^T F - I).
 
-All vectorized with numpy + cv2.remap; ~0.1-0.3 s per 2048x2048 frame.
+All vectorized with numpy + cv2.remap, with chunks of subsets matched in parallel threads (THREADS);
+about 0.3 s per frame on one M4 core at the analysis_settings.json defaults (about 2000 points).
 """
 from __future__ import annotations
 
