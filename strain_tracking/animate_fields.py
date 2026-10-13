@@ -70,6 +70,8 @@ npz = os.path.abspath(a.npz)
 TEST_ROOT = testcfg.get(npz).root
 out_dir, tag = os.path.dirname(npz), os.path.splitext(os.path.basename(npz))[0]
 R = np.load(npz, allow_pickle=True)
+if "branch" in R and str(R["branch"]) == "loading":
+    print("track holds the loading branch only (track_protocols.py --loading-only)")
 X0, shape, times = R["X0"], tuple(R["shape"]), R["times"]
 pos, valid = R["pos"], R["valid"]
 T = len(times)

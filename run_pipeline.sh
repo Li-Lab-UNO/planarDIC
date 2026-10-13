@@ -26,7 +26,8 @@ YES=0
 SETUP=0
 if command -v nproc >/dev/null 2>&1; then NCPU=$(nproc); else NCPU=$(sysctl -n hw.ncpu 2>/dev/null || echo 4); fi
 JOBS=$(( NCPU > 1 ? NCPU - 1 : 1 ))
-STATUS_EVERY=30
+STATUS_EVERY=1
+LOADING_ONLY=""
 
 usage() {
   cat <<EOF
@@ -54,8 +55,10 @@ Options:
   -s, --steps LIST         steps to run (default: all)
   -j, --jobs N             parallel tracking / export jobs (default: CPU count - 1 = $JOBS)
   -d, --defs LIST          deformations to track (default: Def11-Def19)
+      --loading-only       track each deformation to the end of loading only (about 55% of the frames;
+                           the loading frames are the same as in a full-cycle track)
       --status N           while tracking, print the progress of the running deformations every N s
-                           (default: 30; 0 turns it off)
+                           (default: 1; 0 turns it off)
   -e, --export-defs LIST   deformations to export (default: Def11)
   -l, --label TEXT         label for a new config, e.g. "labeled healthy"
   -p, --python PATH        Python to use (default: .venv/bin/python)
@@ -77,6 +80,7 @@ while [ $# -gt 0 ]; do
     -j|--jobs) JOBS="$2"; shift 2 ;;
     -d|--defs) DEFS="${2//,/ }"; shift 2 ;;
     --status) STATUS_EVERY="$2"; shift 2 ;;
+    --loading-only) LOADING_ONLY="--loading-only"; shift ;;
     -e|--export-defs) EXPORT_DEFS="${2//,/ }"; shift 2 ;;
     -l|--label) LABEL="$2"; shift 2 ;;
     -p|--python) PY="$2"; shift 2 ;;
@@ -157,7 +161,7 @@ tlogdir() {
 ndefs=$(echo $DEFS | wc -w | tr -d ' ')
 echo "Tests:   ${TESTS[*]}"
 echo "Steps:   $STEPS"
-has track && echo "Track:   $DEFS ($(( ${#TESTS[@]} * ndefs )) deformations, $JOBS at a time)"
+has track && echo "Track:   $DEFS ($(( ${#TESTS[@]} * ndefs )) deformations, $JOBS at a time${LOADING_ONLY:+, loading branch only})"
 has exports && echo "Exports: $EXPORT_DEFS"
 echo "Python:  $PY"
 [ "$DRY" = 1 ] && echo "(dry run: commands are printed, not run)"
@@ -171,8 +175,11 @@ if [ "$DRY" = 0 ]; then
   CONSOLE=()
   for t in "${TESTS[@]}"; do mkdir -p "$(tlogdir "$t")"; CONSOLE+=("$(tlogdir "$t")/pipeline.log"); done
   exec > >(tee "${CONSOLE[@]}") 2>&1   # everything printed from here on also goes to each test's pipeline.log
+  T_RUN=$SECONDS                         # runtime is counted from here (after the confirmation question)
 fi
-export DIC_PROGRESS=lines DIC_PROGRESS_EVERY=10 PY DRY HERE STAMP STATE
+# each tracking job writes a progress line to its log this often, so the status line can be as current
+DIC_PROGRESS_EVERY=$(( STATUS_EVERY > 0 && STATUS_EVERY < 10 ? STATUS_EVERY : 10 ))
+export DIC_PROGRESS=lines DIC_PROGRESS_EVERY PY DRY HERE STAMP STATE LOADING_ONLY
 export -f tlogdir
 
 # run NAME TEST CMD...: run one command with its own log in TEST's log folder (TEST empty: a cross-test step).
@@ -198,6 +205,13 @@ export -f run
 
 ST="$HERE/strain_tracking"
 step() { echo; echo "== $1  ($(date +%H:%M:%S))"; }
+# hms SECONDS: "1 h 02 min 05 s", "12 min 05 s" or "5 s"
+hms() {
+  local s=$1
+  if [ "$s" -ge 3600 ]; then printf "%d h %02d min %02d s" $((s / 3600)) $((s % 3600 / 60)) $((s % 60))
+  elif [ "$s" -ge 60 ]; then printf "%d min %02d s" $((s / 60)) $((s % 60))
+  else printf "%d s" "$s"; fi
+}
 
 # track_status SECONDS: while tracking runs, print one line every SECONDS with the deformations finished
 # and the progress of each running one (read from the progress lines in its track_*.log)
@@ -260,7 +274,7 @@ if has track; then
   step "tracking ($JOBS jobs at a time; one log per deformation)"
   track_one() {   # TEST DEF
     OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 \
-      run "track_$2" "$1" "$PY" "$HERE/strain_tracking/track_protocols.py" --test "$1" --defs "$2"
+      run "track_$2" "$1" "$PY" "$HERE/strain_tracking/track_protocols.py" --test "$1" --defs "$2" $LOADING_ONLY
   }
   export -f track_one
   if [ "$DRY" = 1 ]; then
@@ -272,7 +286,7 @@ if has track; then
     for t in "${TESTS[@]}"; do for d in $DEFS; do echo "$t $d"; done; done \
       | xargs -P "$JOBS" -L 1 bash -c 'track_one "$0" "$1"'
     kill "$status_pid" 2>/dev/null; wait "$status_pid" 2>/dev/null
-    echo "  tracking finished in $(( (SECONDS - t_track) / 60 )) min $(( (SECONDS - t_track) % 60 )) s"
+    echo "  tracking finished in $(hms $(( SECONDS - t_track )))"
     for t in "${TESTS[@]}"; do      # a test with a failed deformation is not passed on to later steps
       d=$(tlogdir "$t")
       ls "$d"/track_*.log >/dev/null 2>&1 || continue
@@ -301,7 +315,7 @@ if has artifacts; then
   if [ ${#RETRACK[@]} -gt 0 ]; then
     step "tracking again with the new exclusions: ${RETRACK[*]}"
     for t in "${RETRACK[@]}"; do for d in $DEFS; do echo "$t $d"; done; done \
-      | xargs -P "$JOBS" -L 1 bash -c 'OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 run "retrack_$1" "$0" "$PY" "$HERE/strain_tracking/track_protocols.py" --test "$0" --defs "$1"'
+      | xargs -P "$JOBS" -L 1 bash -c 'OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 run "retrack_$1" "$0" "$PY" "$HERE/strain_tracking/track_protocols.py" --test "$0" --defs "$1" $LOADING_ONLY'
     for t in "${RETRACK[@]}"; do
       SOFT=1 run artifacts_recheck "$t" "$PY" "$ST/artifact_check.py" --test "$t" --report-only
       grep -h "CONFIRMED" "$(tlogdir "$t")/artifacts_recheck.log" >/dev/null 2>&1 \
@@ -372,7 +386,9 @@ if has track || has artifacts; then
 fi
 echo "logs: <test folder>/pipeline_logs/run_$STAMP/"
 if [ -s "$STATE/failures.txt" ]; then
-  echo "FAILED steps:"; sed 's/^/  /' "$STATE/failures.txt"; rm -rf "$STATE"; exit 1
+  echo "FAILED steps:"; sed 's/^/  /' "$STATE/failures.txt"; rm -rf "$STATE"
+  echo "total runtime: $(hms $(( SECONDS - T_RUN )))  (finished $(date '+%Y-%m-%d %H:%M:%S'))"; exit 1
 fi
 rm -rf "$STATE"
 echo "all steps finished"
+echo "total runtime: $(hms $(( SECONDS - T_RUN )))  (finished $(date '+%Y-%m-%d %H:%M:%S'))"

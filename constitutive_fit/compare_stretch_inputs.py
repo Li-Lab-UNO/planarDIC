@@ -71,7 +71,7 @@ def lam_from_F(F):
 
 
 TRACK_SUFFIX = {"standard": "", "tine_region": "_tine_region"}
-LOADING_SLACK_S = 2.0   # s past the logged Recover start searched for the rake peak
+LOADING_SLACK_S = D.LOADING_SLACK_S   # s past the logged Recover start searched for the rake peak
 
 
 def loading_end(Dd, t0, t_recover, slack=LOADING_SLACK_S):

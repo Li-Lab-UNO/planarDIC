@@ -136,6 +136,12 @@ jobs run at once (default: CPU count − 1); `--defs` and `--export-defs` choose
 `--setup` builds `.venv` first. `./run_pipeline.sh --help` lists every option. Tracking takes most
 of the time: roughly 5–30 min per deformation, depending on its frame count and the machine.
 
+`--loading-only` tracks each deformation only to the end of loading (the logged Recover start + 2 s),
+about 55% of the frames. The fits use only the loading branch, and tracking runs forward, so the
+loading frames come out the same as in a full-cycle track. Animations and CellScale comparisons then
+cover loading only, and the unloading branch (closure back toward the rest state) is not tracked. The
+track records `branch`, and `strain_tracking/status.py` marks loading-only tracks.
+
 ## Setting up a new test
 
 `NEW_TEST_UBUNTU.md` walks through these steps command by command.
@@ -217,6 +223,7 @@ written every 30 s (`DIC_PROGRESS_EVERY` sets the interval). `DIC_PROGRESS=lines
 `DIC_PROGRESS=0` turns the line off.
 
 `run_pipeline.sh` tracks each deformation as its own job with its own log, so the per-frame lines go to
-the logs (every 10 s). While tracking runs it prints a status line every 30 s (`--status N`; 0 turns it
-off) with the deformations finished and the percent done of each running one, and when tracking ends it
-prints the total tracking time.
+the logs. While tracking runs it prints a status line every second (`--status N` for every N s; 0 turns
+it off) with the deformations finished and the percent done of each running one; each job's log is
+updated as often (at most every 10 s). It prints the total tracking time when tracking ends, and the total
+runtime of the run at the end of the summary, both on screen and in each test's `pipeline.log`.

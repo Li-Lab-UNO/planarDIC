@@ -7,7 +7,7 @@ Status of every test folder: what has been set up, tracked and exported, read fr
 
 Columns: sorted (DefNN folders), config (test_config.json), scale (px/mm; excluded tine pairs),
 widths (w_theta / w_z tine spans, mm), H (thickness, mm), tracked (deformations with a full-domain
-track among Def11-Def19), J/mean (peak_J_over_mean figure), exports (deformations with
+track among Def11-Def19; "loading only" marks track_protocols.py --loading-only tracks), J/mean (peak_J_over_mean figure), exports (deformations with
 *_fields.npz).
 """
 import argparse
@@ -16,12 +16,26 @@ import json
 import os
 import re
 import sys
+import zipfile
+
+import numpy as np
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import testcfg  # noqa: E402
 
 DEFS = [f"Def{i}" for i in range(11, 20)]
+
+
+def branch(npz):
+    """'loading' for a track_protocols.py --loading-only track, else 'full'."""
+    try:
+        with zipfile.ZipFile(npz) as z:
+            if "branch.npy" in z.namelist():
+                return str(np.load(z.open("branch.npy")))
+    except (OSError, zipfile.BadZipFile, ValueError):
+        pass
+    return "full"
 
 
 def def_range(found):
@@ -37,7 +51,9 @@ def row(td):
     T = testcfg.Test(td)
     img = T.images
     folders = sorted(d for d in os.listdir(img) if re.match(r"Def\d\d_", d)) if os.path.isdir(img) else []
-    tracked = [d for d in DEFS if glob.glob(os.path.join(img, d + "_*", "strain_results", d + "_*_tine_region.npz"))]
+    tracks = {d: glob.glob(os.path.join(img, d + "_*", "strain_results", d + "_*_tine_region.npz")) for d in DEFS}
+    tracked = [d for d in DEFS if tracks[d]]
+    loading = [d for d in tracked if branch(tracks[d][0]) == "loading"]
     exported = [d for d in DEFS if glob.glob(os.path.join(img, d + "_*", "strain_results", d + "_*_fields.npz"))]
     cfg = T.config
     sc = json.load(open(T.scale_file)) if os.path.exists(T.scale_file) else None
@@ -52,7 +68,8 @@ def row(td):
                 sorted=f"{len(folders)} folders" if folders else "no",
                 config="yes" if cfg else "no", scale=scale,
                 widths=f"{w[0]:.2f} / {w[1]:.2f}" if w else "-", H=f"{H:.2f}" if H else "-",
-                tracked=def_range(tracked),
+                tracked=def_range(tracked) + (" (loading only)" if loading and loading == tracked
+                                              else f" ({def_range(loading)} loading only)" if loading else ""),
                 jmean="yes" if os.path.exists(os.path.join(img, "peak_J_over_mean_Def11-19.png")) else "no",
                 exports=def_range(exported), notes=cfg.get("notes", []), label=cfg.get("sample", ""))
 

@@ -87,6 +87,8 @@ def main():
     testcfg.get(npz)
     out_dir, tag = os.path.dirname(npz), os.path.splitext(os.path.basename(npz))[0]
     R = np.load(npz, allow_pickle=True)
+    if "branch" in R and str(R["branch"]) == "loading":
+        print("track holds the loading branch only (track_protocols.py --loading-only)")
     X0, shape, times = R["X0"], tuple(R["shape"]), R["times"]
     pos, valid = R["pos"], R["valid"]
     step = float(R["step"])

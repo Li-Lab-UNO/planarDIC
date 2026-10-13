@@ -50,6 +50,8 @@ out_dir = os.path.dirname(os.path.abspath(a.npz))
 tag = os.path.splitext(os.path.basename(a.npz))[0]
 
 R = np.load(a.npz, allow_pickle=True)
+if "branch" in R and str(R["branch"]) == "loading":
+    print("track holds the loading branch only (track_protocols.py --loading-only)")
 MPP_ = D.load_scale()["mm_per_px"]
 X0, shape, times = R["X0"], tuple(R["shape"]), R["times"]
 pos, valid, zncc = R["pos"], R["valid"], R["zncc"]

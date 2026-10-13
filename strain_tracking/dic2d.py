@@ -292,6 +292,28 @@ def settings_label(R, mm_per_px, window_label):
     return f"{subset}, {window_label.replace(' Gaussian', '')} strain window"
 
 
+LOADING_SLACK_S = 2.0   # s past the logged Recover start: the logged boundary can lag the rake motion
+
+
+def loading_end_time(test_root, folder, slack=LOADING_SLACK_S):
+    """Time (s) up to which deformation `folder` (DefNN_...) is loading: the logged Recover start of its
+    cycle plus `slack`. DefNN is the NN-th Stretch phase of Logs/*_PhaseTiming.csv (sort_images.py); the
+    rake peak that ends the loading branch for the fits lies in this window (compare_stretch_inputs.loading_end)."""
+    import csv
+    import glob
+    m = re.match(r"(?i)def(\d+)", os.path.basename(str(folder)))
+    logs = sorted(glob.glob(os.path.join(test_root, "Logs", "*PhaseTiming.csv")))
+    if not m or not logs:
+        raise ValueError(f"no PhaseTiming log or DefNN folder name for {folder}")
+    rows = list(csv.DictReader(open(logs[0])))
+    stretch = [r for r in rows if r["Phase"] == "Stretch"]
+    st = stretch[int(m.group(1)) - 1]
+    rec = [r for r in rows if r["Phase"] == "Recover" and r["Set"] == st["Set"] and r["Cycle"] == st["Cycle"]]
+    if not rec:
+        raise ValueError(f"no Recover phase for {folder} (Set {st['Set']}, cycle {st['Cycle']})")
+    return float(rec[0]["StartTime(s)"]) + slack
+
+
 def programmed_stretch(test_root, folder):
     """Programmed rake stretch (axial %, circumferential %) of a deformation folder, read from the
     protocol table of the test's .tst file (X = axial, Y = circumferential; NumReps expands into
@@ -486,6 +508,10 @@ class Reference:
         d = np.arange(-radius, radius + 1, dtype=np.float64)
         DX, DY = np.meshgrid(d, d)
         self.dx, self.dy = DX.ravel(), DY.ravel()                 # (S,)
+        self.dx32, self.dy32 = self.dx.astype(np.float32), self.dy.astype(np.float32)
+        self.B3 = np.stack([np.ones_like(self.dx), self.dx, self.dy], 1)   # (S,3): [1, dx, dy]
+        self.corners = np.array([[-radius, radius, -radius, radius],
+                                 [-radius, -radius, radius, radius]], np.float64)
 
     def _subset_data(self, img, centers, use=None):
         cx, cy = centers[:, :1], centers[:, 1:]
@@ -522,6 +548,8 @@ class Reference:
         """Reference every subset to `img` at self.centers (`use`: usable-pixel mask, or None)."""
         (self.f, self.df, self.J, self.Hinv, self.ok,
          self.w, self.f_raw) = self._subset_data(img, self.centers, use)
+        # contiguous copies of the gradients for icgn's steepest-descent sums
+        self.fx, self.fy = np.ascontiguousarray(self.J[:, :, 0]), np.ascontiguousarray(self.J[:, :, 3])
         return self
 
     def update(self, img, idx, centers, use=None):
@@ -531,6 +559,7 @@ class Reference:
         f, df, J, Hinv, ok, w, f_raw = self._subset_data(img, np.asarray(centers, np.float64), use)
         self.centers[idx] = centers
         self.f[idx], self.df[idx], self.J[idx], self.Hinv[idx], self.ok[idx] = f, df, J, Hinv, ok
+        self.fx[idx], self.fy[idx] = J[:, :, 0], J[:, :, 3]
         if self.w is not None:
             self.w[idx], self.f_raw[idx] = w, f_raw
         return self
@@ -556,6 +585,26 @@ def _usable_at(use, xw, yw):
                       borderMode=cv2.BORDER_CONSTANT, borderValue=0) > 0.5).astype(np.float64)
 
 
+def _warp_coords(ref, idx, p):
+    """Warped pixel coordinates of subsets idx under affine parameters p, in float32 (the precision
+    cv2.remap samples at): each subset's center offset is rounded once, then the local terms added."""
+    cx = (ref.centers[idx, 0] + p[:, 0]).astype(np.float32)[:, None]
+    cy = (ref.centers[idx, 1] + p[:, 3]).astype(np.float32)[:, None]
+    xw = cx + (1 + p[:, 1:2]).astype(np.float32) * ref.dx32 + p[:, 2:3].astype(np.float32) * ref.dy32
+    yw = cy + p[:, 4:5].astype(np.float32) * ref.dx32 + (1 + p[:, 5:6]).astype(np.float32) * ref.dy32
+    return xw, yw
+
+
+def _leaves_image(ref, idx, p, shape):
+    """True for subsets whose bicubic stencil leaves the image; the warp is affine, so its 4 corners decide."""
+    h, w = shape[:2]
+    cdx, cdy = ref.corners
+    x = ref.centers[idx, :1] + p[:, :1] + (1 + p[:, 1:2]) * cdx + p[:, 2:3] * cdy
+    y = ref.centers[idx, 1:] + p[:, 3:4] + p[:, 4:5] * cdx + (1 + p[:, 5:6]) * cdy
+    with np.errstate(invalid="ignore"):
+        return ~((x >= 1) & (y >= 1) & (x <= w - 3) & (y <= h - 3)).all(1)
+
+
 def icgn(ref: Reference, img, p0, max_iter=100, tol=1e-3, use=None):
     """
     Match all subsets of `ref` into `img` starting from p0 (N,6).
@@ -573,20 +622,28 @@ def icgn(ref: Reference, img, p0, max_iter=100, tol=1e-3, use=None):
         if idx.size == 0:
             break
         pa = p[idx]
-        cx, cy = ref.centers[idx, :1], ref.centers[idx, 1:]
-        xw = cx + pa[:, :1] + (1 + pa[:, 1:2]) * ref.dx + pa[:, 2:3] * ref.dy
-        yw = cy + pa[:, 3:4] + pa[:, 4:5] * ref.dx + (1 + pa[:, 5:6]) * ref.dy
-        g = _sample(img, xw, yw).astype(np.float64)
-        bad = ~np.isfinite(g).all(1)
-        g = np.nan_to_num(g)
+        xw, yw = _warp_coords(ref, idx, pa)
+        bad = _leaves_image(ref, idx, pa, img.shape)
+        g = cv2.remap(img, xw, yw, cv2.INTER_CUBIC, borderMode=cv2.BORDER_REPLICATE).astype(np.float64)
+        g[bad] = 0
         if ref.w is None:
-            g = g - g.mean(1, keepdims=True)
-            dg = np.sqrt((g ** 2).sum(1)) + 1e-12
+            g -= g.mean(1, keepdims=True)
+            dg = np.sqrt(np.einsum("ns,ns->n", g, g)) + 1e-12
+            e = ref.f[idx] - (ref.df[idx] / dg)[:, None] * g
+        elif use is None:
+            # usable pixels are the reference's, so ref.f and ref.df already hold the masked, centered terms
+            w = ref.w[idx]
+            g -= (np.einsum("ns,ns->n", w, g) / np.maximum(w.sum(1), 1))[:, None]
+            g *= w
+            dg = np.sqrt(np.einsum("ns,ns->n", g, g)) + 1e-12
             e = ref.f[idx] - (ref.df[idx] / dg)[:, None] * g
         else:
             fc, df_, g, dg = _weighted_pair(ref, idx, g, _usable_at(use, xw, yw))
             e = fc - (df_ / dg)[:, None] * g
-        b = np.einsum("nsi,ns->ni", ref.J[idx], e)
+        # b = J^T e with J = [fx, fx dx, fx dy, fy, fy dx, fy dy], as two (n,S) x (S,3) products
+        with np.errstate(divide="ignore", over="ignore", invalid="ignore"):
+            # (numpy 2.0 with Apple Accelerate flags these on finite inputs; a NaN would still propagate to p)
+            b = np.concatenate([(ref.fx[idx] * e) @ ref.B3, (ref.fy[idx] * e) @ ref.B3], 1)
         dp = -np.einsum("nij,nj->ni", ref.Hinv[idx], b)
         A = _affine(pa) @ np.linalg.inv(_affine(dp))
         p[idx] = _params(A)

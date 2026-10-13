@@ -23,6 +23,12 @@ Grid (--grid):
 
     ../.venv/bin/python track_protocols.py --test N1739/test1
     ../.venv/bin/python track_protocols.py --test N1690/test1 --defs Def11
+    ../.venv/bin/python track_protocols.py --test N1739/test1 --loading-only
+
+--loading-only stops each deformation at the end of loading (the logged Recover start + 2 s,
+dic2d.loading_end_time), about 55% of the frames. Tracking runs forward, so the loading frames are the
+same as in a full-cycle track; the unloading frames are left out (animations and CellScale comparisons
+then cover loading only). The npz records branch = "loading" or "full".
 Outputs: Images/DefNN_*/strain_results/DefNN_*[_tine_region].npz
 """
 import argparse
@@ -41,7 +47,7 @@ DEFAULT_DEFS = [f"Def{i}" for i in range(11, 20)]
 
 
 def run(T, defs=DEFAULT_DEFS, grid="tine_region", roi=None, step=None, radius=None, mask_saturated=None,
-        out_dir=None):
+        out_dir=None, loading_only=False):
     """Track deformations `defs` of test T on `grid` against the common reference.
     step / radius (px) default to analysis_settings.json converted with the test's scale.
     out_dir: write the .npz files there instead of each deformation's strain_results/ (for trials)."""
@@ -80,6 +86,10 @@ def run(T, defs=DEFAULT_DEFS, grid="tine_region", roi=None, step=None, radius=No
     t_all = time.time()
     for i, fd in enumerate(folders, 1):
         times, paths = D.find_frames([os.path.join(T.images, fd)])
+        n_all, branch = len(paths), "full"
+        if loading_only:
+            keep = times <= D.loading_end_time(T.root, fd) + 1e-6
+            times, paths, branch = times[keep], [q for q, k in zip(paths, keep) if k], "loading"
         # bridge: reference frame -> this deformation's first frame
         img0, use0 = D.load_frame(paths[0], prm)
         p, c, conv = D.icgn(ref, img0, np.zeros((len(X0ref), 6)), use=use0 if prm.sat_current else None)
@@ -88,7 +98,8 @@ def run(T, defs=DEFAULT_DEFS, grid="tine_region", roi=None, step=None, radius=No
         X_start = X0ref + p[:, [0, 3]]
         u = X_start - X0ref
         prm.exclude_px = tuple(D.shift_rects(excl_r, X0ref, X_start, good))   # into this protocol's first frame
-        print(f"[{i}/{len(folders)}] {fd}: {len(paths)} frames; bridge valid {good.mean()*100:.1f}%, median ZNCC {np.nanmedian(c):.4f}, "
+        print(f"[{i}/{len(folders)}] {fd}: {len(paths)} frames"
+              + (f" (loading branch of {n_all}, to t = {times[-1]:.1f} s)" if loading_only else "") + f"; bridge valid {good.mean()*100:.1f}%, median ZNCC {np.nanmedian(c):.4f}, "
               f"rest-state offset median {np.median(np.hypot(*u.T)):.2f} px", flush=True)
         t = time.time()
         res = D.track_sequence(paths, X_start, prm, times=times, label=fd.split("_")[0])
@@ -105,7 +116,7 @@ def run(T, defs=DEFAULT_DEFS, grid="tine_region", roi=None, step=None, radius=No
                             exclude_px=np.array(excl, float).reshape(-1, 4),
                             reference=f"{ref_fd} t={t_ref[0]:.1f}s", X_start=D.to_native(X_start, f), bridge_zncc=c,
                             px_per_mm=scale["px_per_mm"], resample=f, track_px_per_mm=ppm,
-                            subset_mm=(2 * radius + 1) / ppm, step_mm=step / ppm, **res)
+                            subset_mm=(2 * radius + 1) / ppm, step_mm=step / ppm, branch=branch, **res)
         print(f"   tracked in {time.time()-t:.0f} s; valid per frame median {np.median(res['valid'].mean(1))*100:.1f}%, "
               f"min {res['valid'].mean(1).min()*100:.1f}%; saved {out}", flush=True)
     print(f"all {len(folders)} deformations tracked in {D._hms(time.time() - t_all)}", flush=True)
@@ -123,8 +134,10 @@ def main():
     ap.add_argument("--mask-saturated", action=argparse.BooleanOptionalAction,
                     default=T.config.get("dic", {}).get("mask_saturated", False),
                     help="leave saturated glint pixels out of the matching (default: the test's dic.mask_saturated)")
+    ap.add_argument("--loading-only", action="store_true",
+                    help="track each deformation to the end of loading only (Recover start + 2 s)")
     a = ap.parse_args()
-    run(T, a.defs, a.grid, a.roi, a.step, a.radius, a.mask_saturated)
+    run(T, a.defs, a.grid, a.roi, a.step, a.radius, a.mask_saturated, loading_only=a.loading_only)
 
 
 if __name__ == "__main__":
