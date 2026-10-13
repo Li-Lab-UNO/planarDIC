@@ -141,8 +141,10 @@ starting (`--yes` skips the question), writes each test's logs to `<test folder>
 steps of a test whose step failed, and prints a summary. `--jobs` sets how many tracking or export
 jobs run at once (default: CPU count − 1); `--defs` and `--export-defs` choose the deformations;
 `--setup` builds `.venv` first. `./run_pipeline.sh --help` lists every option. The parallel jobs share
-the CPUs: each job uses (CPU count ÷ jobs) OpenCV threads (`DIC_CV_THREADS`; OpenCV would otherwise
-start one thread per CPU in every job), and one thread for NumPy's linear algebra. Tracking takes most
+the CPUs: each job gets (CPU count ÷ jobs) threads (`DIC_THREADS`), matches chunks of its subsets in
+parallel on them and reads the next image while matching; OpenCV's and NumPy's own threading are limited
+to match. A script run on its own uses every CPU. The subsets are matched independently, so the results
+do not depend on the thread count. Tracking takes most
 of the time: roughly 5–30 min per deformation, depending on its frame count and the machine.
 
 `--loading-only` tracks each deformation only to the end of loading (the logged Recover start + 2 s),

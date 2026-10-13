@@ -33,10 +33,38 @@ import numpy as np
 from scipy import ndimage
 from scipy.spatial import cKDTree
 
-# OpenCV starts one thread per logical CPU by default; parallel jobs (run_pipeline.sh) share the CPUs
-# through DIC_CV_THREADS. (macOS builds use Grand Central Dispatch, which only honors 0 = no threading.)
-if os.environ.get("DIC_CV_THREADS", "").isdigit():
-    cv2.setNumThreads(int(os.environ["DIC_CV_THREADS"]))
+# Threads per process. Subsets are matched independently, so icgn() splits them into chunks matched in
+# parallel threads (NumPy and OpenCV release the GIL in the array work), and track_sequence() reads the next
+# image while matching. DIC_THREADS sets the count (default: every CPU); run_pipeline.sh gives each of its
+# parallel jobs a share. OpenCV's own threads are limited to match, so jobs and chunks don't oversubscribe
+# the CPUs: none when the chunks run in parallel, one per job otherwise (macOS builds use Grand Central
+# Dispatch, which ignores a limit of 1).
+_POOL = None
+
+
+def set_threads(n):
+    """Use n threads per process from here on (e.g. from a notebook)."""
+    global THREADS, _POOL
+    THREADS, _POOL = max(int(n), 1), None
+    cv2.setNumThreads(0 if THREADS > 1 else 1)
+
+
+set_threads(os.environ["DIC_THREADS"] if os.environ.get("DIC_THREADS", "").isdigit() else (os.cpu_count() or 1))
+
+
+def _parallel_rows(fn, n, min_rows=48):
+    """Call fn(rows) on chunks of range(n), in parallel threads when THREADS > 1. fn writes disjoint rows."""
+    global _POOL
+    k = min(2 * THREADS, n // min_rows) if THREADS > 1 else 1
+    if k <= 1:
+        fn(np.arange(n))
+        return
+    if _POOL is None:
+        from concurrent.futures import ThreadPoolExecutor
+        _POOL = ThreadPoolExecutor(THREADS)
+    for _ in _POOL.map(fn, np.array_split(np.arange(n), k)):     # re-raises an exception from any chunk
+        pass
+
 
 FNAME_RE = re.compile(r"\.(\d{6})\.(\d{3})\.jpg$")
 
@@ -616,14 +644,22 @@ def icgn(ref: Reference, img, p0, max_iter=100, tol=1e-3, use=None):
     Returns p (N,6), zncc (N,), converged (N,).
     With a glint-masked reference (ref.w), pixels that are saturated in the reference or
     (via `use`, the current image's usable mask) in the current image are left out.
+    Subsets are independent; chunks of them are matched in parallel threads (THREADS).
     """
     p = p0.copy()
     n = p.shape[0]
-    active = ref.ok.copy()
     conv = np.zeros(n, bool)
+    zncc = np.full(n, np.nan)
+    _parallel_rows(lambda rows: _icgn_rows(ref, img, p, conv, zncc, rows, max_iter, tol, use), n)
+    return p, zncc, conv
+
+
+def _icgn_rows(ref, img, p, conv, zncc, rows, max_iter, tol, use):
+    """IC-GN for subsets `rows`, writing their p, conv and zncc in place."""
+    active = ref.ok[rows].copy()
     r = ref.radius
     for _ in range(max_iter):
-        idx = np.nonzero(active)[0]
+        idx = rows[active]
         if idx.size == 0:
             break
         pa = p[idx]
@@ -656,27 +692,27 @@ def icgn(ref: Reference, img, p0, max_iter=100, tol=1e-3, use=None):
                        + ((r * dp[:, [1, 2, 4, 5]]) ** 2).sum(1))
         done = (step < tol) | bad
         conv[idx[done & ~bad]] = True
-        active[idx[done]] = False
-        active[idx[bad]] = False
         p[idx[bad]] = np.nan
+        active[np.flatnonzero(active)[done]] = False
     # Final correlation coefficient at the converged warp
-    cx, cy = ref.centers[:, :1], ref.centers[:, 1:]
-    pp = np.nan_to_num(p)
+    cx, cy = ref.centers[rows, :1], ref.centers[rows, 1:]
+    pr = p[rows]
+    pp = np.nan_to_num(pr)
     xw = cx + pp[:, :1] + (1 + pp[:, 1:2]) * ref.dx + pp[:, 2:3] * ref.dy
     yw = cy + pp[:, 3:4] + pp[:, 4:5] * ref.dx + (1 + pp[:, 5:6]) * ref.dy
     g = _sample(img, xw, yw).astype(np.float64)
     if ref.w is None:
         g = g - np.nanmean(g, 1, keepdims=True)
         dg = np.sqrt(np.nansum(g ** 2, 1)) + 1e-12
-        zncc = np.nansum(ref.f * g, 1) / (ref.df * dg)
+        z = np.nansum(ref.f[rows] * g, 1) / (ref.df[rows] * dg)
     else:
         finite = np.isfinite(g)
         wc = _usable_at(use, xw, yw)
         wc = finite.astype(np.float64) if wc is None else wc * finite
-        fc, df_, gc, dg = _weighted_pair(ref, np.arange(n), np.nan_to_num(g), wc)
-        zncc = (fc * gc).sum(1) / (df_ * dg)
-    zncc[~ref.ok | ~np.isfinite(p).all(1)] = np.nan
-    return p, zncc, conv
+        fc, df_, gc, dg = _weighted_pair(ref, rows, np.nan_to_num(g), wc)
+        z = (fc * gc).sum(1) / (df_ * dg)
+    z[~ref.ok[rows] | ~np.isfinite(pr).all(1)] = np.nan
+    zncc[rows] = z
 
 
 def _fill_from_neighbors(pts, p, good, k=8):
@@ -762,8 +798,19 @@ def track_sequence(paths, X0, prm: TrackParams, verbose=True, times=None, label=
     p = np.zeros((N, 6))
     p_prev = p.copy()
     bar = Progress(T, label) if verbose else None
+    # with threads to spare, the next image is read while the current one is matched
+    reader = None
+    if THREADS > 1 and T > 1:
+        from concurrent.futures import ThreadPoolExecutor
+        reader = ThreadPoolExecutor(1)
+        nxt = reader.submit(load_frame, paths[1], prm)
     for k in range(1, T):
-        img, use = load_frame(paths[k], prm)
+        if reader is not None:
+            img, use = nxt.result()
+            if k + 1 < T:
+                nxt = reader.submit(load_frame, paths[k + 1], prm)
+        else:
+            img, use = load_frame(paths[k], prm)
         # constant-velocity predictor, scaled by the actual time step (frame gaps)
         r_dt = 1.0
         if times is not None and k >= 2:
@@ -810,6 +857,8 @@ def track_sequence(paths, X0, prm: TrackParams, verbose=True, times=None, label=
                               f"keyframes {len(keyframes)}")
     if bar:
         bar.close()
+    if reader is not None:
+        reader.shutdown()
     return dict(pos=pos, zncc=zn, valid=valid, fail=fail, keyframes=np.array(keyframes))
 
 

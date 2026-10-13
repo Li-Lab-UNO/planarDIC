@@ -234,7 +234,7 @@ ndefs=$(echo $DEFS | wc -w | tr -d ' ')
 echo "Tests:   ${TESTS[*]}"
 echo "Config:  ${CONF#$HERE/}"
 echo "Steps:   $STEPS"
-has track && echo "Track:   $DEFS ($(( ${#TESTS[@]} * ndefs )) deformations, $JOBS at a time, $(( NCPU / JOBS > 1 ? NCPU / JOBS : 1 )) OpenCV threads each${LOADING_ONLY:+, loading branch only})"
+has track && echo "Track:   $DEFS ($(( ${#TESTS[@]} * ndefs )) deformations, $JOBS at a time, $(( NCPU / JOBS > 1 ? NCPU / JOBS : 1 )) threads each${LOADING_ONLY:+, loading branch only})"
 has exports && echo "Exports: $EXPORT_DEFS"
 echo "Python:  $PY"
 [ "$DRY" = 1 ] && echo "(dry run: commands are printed, not run)"
@@ -252,10 +252,10 @@ if [ "$DRY" = 0 ]; then
 fi
 # each tracking job writes a progress line to its log this often, so the status line can be as current
 DIC_PROGRESS_EVERY=$(( STATUS_EVERY > 0 && STATUS_EVERY < 10 ? STATUS_EVERY : 10 ))
-# OpenCV threads per job: the CPUs shared among the parallel jobs (OpenCV would otherwise start one thread
-# per CPU in every job, e.g. 64 x 4 on a 64-thread machine running 4 jobs)
-DIC_CV_THREADS=$(( NCPU / JOBS > 1 ? NCPU / JOBS : 1 ))
-export DIC_PROGRESS=lines DIC_PROGRESS_EVERY DIC_CV_THREADS PY DRY HERE STAMP STATE LOADING_ONLY
+# threads per job: the CPUs shared among the parallel jobs (dic2d.THREADS; each tracking job matches chunks
+# of its subsets in parallel, and OpenCV is limited to match)
+DIC_THREADS=$(( NCPU / JOBS > 1 ? NCPU / JOBS : 1 ))
+export DIC_PROGRESS=lines DIC_PROGRESS_EVERY DIC_THREADS PY DRY HERE STAMP STATE LOADING_ONLY
 export -f tlogdir
 
 # run NAME TEST CMD...: run one command with its own log in TEST's log folder (TEST empty: a cross-test step).
