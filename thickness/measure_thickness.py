@@ -11,7 +11,8 @@ tissue band in the photo. For each image the script:
        (so perspective across the frame does not bias it).
      * ruler: gray steel ruler. The tick period is read along both long edges; the mm
        edge is told from the inch edge (1/16 or 1/32 in) by the ratio of the periods.
-  2. Strip. Tissue is warm (high Lab b*) against the blue mat and the neutral ruler.
+  2. Strip. Tissue is warm (high Lab b*) against the blue mat and the white board, and brighter than
+     the dark steel of the ruler (there brightness alone decides: wet films on the steel look warm).
      The mask is opened with a disk of OPEN_MM radius, which strips off loose fibers,
      Petri-dish rim highlights and glare. Strips cut by the image border are skipped.
   3. Thickness. The centerline is the longest path through the mask skeleton,
@@ -52,6 +53,8 @@ OPEN_MM = 0.25      # opening radius: removes fibers/rims thinner than ~2*OPEN_M
 CLOSE_MM = 0.4      # closing radius: joins the medial and adventitial layers across the
                     # darker seam between them (gaps up to ~2*CLOSE_MM)
 MIN_AREA_MM2 = 3.0  # smallest tissue blob kept
+RULER_TISSUE_PCT = 75   # on the ruler: tissue brightness = this percentile of the pixels brighter than the steel
+RULER_EDGE_FRAC = 0.6   # ... and the tissue edge this fraction of the way from the steel's brightness to it
 STEP_MM = 0.1       # station spacing along the centerline
 TRIM_FRAC = 0.10    # fraction of centerline length dropped at each end
 SMOOTH_MM = 1.0     # centerline smoothing window, at least ...
@@ -326,7 +329,8 @@ def detect_background(img):
 def tissue_mask(img, px_mm, use_L=True, ruler_poly=None):
     """Binary tissue mask at WORK_PX_MM px/mm, and the resampling factor. use_L adds the
     brightness test (blue mat); on the ruler the white board is as bright as tissue, so
-    tissue is found by b* off the ruler and by brightness on it (ruler_poly, full-res px)."""
+    tissue is found by b* off the ruler and by brightness alone on it (ruler_poly, full-res px): the edge
+    on the steel is RULER_EDGE_FRAC of the way from the steel's brightness to the tissue's."""
     f = WORK_PX_MM / px_mm
     im = cv2.resize(img, None, fx=f, fy=f, interpolation=cv2.INTER_AREA)
     lab = cv2.cvtColor(im, cv2.COLOR_BGR2LAB).astype(np.float32)
@@ -352,7 +356,10 @@ def tissue_mask(img, px_mm, use_L=True, ruler_poly=None):
         on = cv2.erode(on, np.ones((5, 5), np.uint8)).astype(bool)
         t, _ = cv2.threshold(L[on].astype(np.uint8).reshape(-1, 1), 0, 255,
                              cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-        m |= (on & (L > max(t, np.percentile(L[on], 50) + 40))).astype(np.uint8)
+        # on the dark steel, brightness alone decides: fluid films there can be warm (b*) but are dark, and
+        # the strip's rounded side shows as a gray band between steel and tissue; both stay below the edge
+        lo, hi = np.percentile(L[on], 50), np.percentile(L[on & (L > t)], RULER_TISSUE_PCT)
+        m[on] = (L[on] > lo + RULER_EDGE_FRAC * (hi - lo)).astype(np.uint8)
     r = max(1, int(round(OPEN_MM * WORK_PX_MM)))
     disk = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * r + 1, 2 * r + 1))
     m = cv2.morphologyEx(m, cv2.MORPH_OPEN, disk)

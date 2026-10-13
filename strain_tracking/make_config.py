@@ -361,6 +361,13 @@ def main():
         th = thickness_from_workbook(T)
         if th:
             cfg["thickness_mm"] = th
+            print(f"thickness: H = {th['H']} mm, SD {th['H_sd']} mm ({th['source']})")
+        else:
+            print(f"thickness: not set (no readings for {T.name.split('_')[0]} in "
+                  f"{os.path.join(os.path.basename(os.path.dirname(T.root)), 'Thickness*', '*.xlsx')}); "
+                  "measure it with thickness/measure_thickness.py and add thickness_mm by hand")
+    else:
+        print(f"thickness: kept from the config (H = {cfg['thickness_mm'].get('H')} mm)")
     Tw = testcfg.Test(T.root)
     Tw.config_file = out_path
     Tw.write_config(cfg)
