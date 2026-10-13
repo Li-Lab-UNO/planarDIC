@@ -68,7 +68,8 @@ class Progress:
 
     In a terminal the line updates in place. When output is redirected (nohup, `> log.txt`,
     `| tee`) it prints a full line every `every` seconds instead, so log files stay readable.
-    Set DIC_PROGRESS=0 to silence it, or DIC_PROGRESS=lines to force full lines.
+    Set DIC_PROGRESS=0 to silence it, or DIC_PROGRESS=lines to force full lines; DIC_PROGRESS_EVERY sets
+    the interval of full lines in seconds.
 
         bar = Progress(len(paths), "Def13")
         for k in range(len(paths)):
@@ -77,7 +78,9 @@ class Progress:
         bar.close()
     """
 
-    def __init__(self, total, label="", every=30.0, stream=None):
+    def __init__(self, total, label="", every=None, stream=None):
+        if every is None:
+            every = float(os.environ.get("DIC_PROGRESS_EVERY", 30))
         self.total, self.label, self.every = max(int(total), 1), label, every
         self.stream = stream or sys.stdout
         mode = os.environ.get("DIC_PROGRESS", "").lower()

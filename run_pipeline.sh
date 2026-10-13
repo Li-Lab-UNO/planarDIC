@@ -26,6 +26,7 @@ YES=0
 SETUP=0
 if command -v nproc >/dev/null 2>&1; then NCPU=$(nproc); else NCPU=$(sysctl -n hw.ncpu 2>/dev/null || echo 4); fi
 JOBS=$(( NCPU > 1 ? NCPU - 1 : 1 ))
+STATUS_EVERY=30
 
 usage() {
   cat <<EOF
@@ -53,6 +54,8 @@ Options:
   -s, --steps LIST         steps to run (default: all)
   -j, --jobs N             parallel tracking / export jobs (default: CPU count - 1 = $JOBS)
   -d, --defs LIST          deformations to track (default: Def11-Def19)
+      --status N           while tracking, print the progress of the running deformations every N s
+                           (default: 30; 0 turns it off)
   -e, --export-defs LIST   deformations to export (default: Def11)
   -l, --label TEXT         label for a new config, e.g. "labeled healthy"
   -p, --python PATH        Python to use (default: .venv/bin/python)
@@ -73,6 +76,7 @@ while [ $# -gt 0 ]; do
     -s|--steps) STEPS="${2//,/ }"; shift 2 ;;
     -j|--jobs) JOBS="$2"; shift 2 ;;
     -d|--defs) DEFS="${2//,/ }"; shift 2 ;;
+    --status) STATUS_EVERY="$2"; shift 2 ;;
     -e|--export-defs) EXPORT_DEFS="${2//,/ }"; shift 2 ;;
     -l|--label) LABEL="$2"; shift 2 ;;
     -p|--python) PY="$2"; shift 2 ;;
@@ -168,7 +172,7 @@ if [ "$DRY" = 0 ]; then
   for t in "${TESTS[@]}"; do mkdir -p "$(tlogdir "$t")"; CONSOLE+=("$(tlogdir "$t")/pipeline.log"); done
   exec > >(tee "${CONSOLE[@]}") 2>&1   # everything printed from here on also goes to each test's pipeline.log
 fi
-export DIC_PROGRESS=lines PY DRY HERE STAMP STATE
+export DIC_PROGRESS=lines DIC_PROGRESS_EVERY=10 PY DRY HERE STAMP STATE
 export -f tlogdir
 
 # run NAME TEST CMD...: run one command with its own log in TEST's log folder (TEST empty: a cross-test step).
@@ -194,6 +198,26 @@ export -f run
 
 ST="$HERE/strain_tracking"
 step() { echo; echo "== $1  ($(date +%H:%M:%S))"; }
+
+# track_status SECONDS: while tracking runs, print one line every SECONDS with the deformations finished
+# and the progress of each running one (read from the progress lines in its track_*.log)
+track_status() {
+  local every="$1" total=$(( ${#TESTS[@]} * ndefs )) t0=$SECONDS
+  [ "$every" -gt 0 ] 2>/dev/null || return 0
+  while sleep "$every"; do
+    local done=0 running="" f last tk
+    for t in "${TESTS[@]}"; do
+      tk=""; [ "${#TESTS[@]}" -gt 1 ] && tk="$(key "$t") "
+      for f in "$(tlogdir "$t")"/track_*.log; do
+        [ -e "$f" ] || continue
+        if grep -q "deformations tracked in\|Traceback" "$f"; then done=$(( done + 1 )); continue; fi
+        last=$(grep -E "^  Def[0-9]+ +[0-9]+/[0-9]+ +[0-9]+%" "$f" | tail -1 | awk '{print $1, $3}')
+        running+="${running:+, }$tk${last:-$(basename "$f" .log | sed 's/track_//') starting}"
+      done
+    done
+    echo "  [$(date +%H:%M:%S), $(( (SECONDS - t0) / 60 )) min] $done/$total done${running:+; running: $running}"
+  done
+}
 # all_tracked TEST: true when Def11-Def19 all have a full-domain track (needed by jfig, edge and compare)
 all_tracked() {
   [ "$DRY" = 1 ] && return 0
@@ -242,8 +266,13 @@ if has track; then
   if [ "$DRY" = 1 ]; then
     for t in "${TESTS[@]}"; do for d in $DEFS; do track_one "$t" "$d"; done; done
   else
+    track_status "$STATUS_EVERY" &
+    status_pid=$!
+    t_track=$SECONDS
     for t in "${TESTS[@]}"; do for d in $DEFS; do echo "$t $d"; done; done \
       | xargs -P "$JOBS" -L 1 bash -c 'track_one "$0" "$1"'
+    kill "$status_pid" 2>/dev/null; wait "$status_pid" 2>/dev/null
+    echo "  tracking finished in $(( (SECONDS - t_track) / 60 )) min $(( (SECONDS - t_track) % 60 )) s"
     for t in "${TESTS[@]}"; do      # a test with a failed deformation is not passed on to later steps
       d=$(tlogdir "$t")
       ls "$d"/track_*.log >/dev/null 2>&1 || continue

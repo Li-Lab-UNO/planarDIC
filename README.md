@@ -212,6 +212,11 @@ CellScale names as written (`Images/`, `Coords1.csv`, `*Data.csv`).
 Tracking (`track.py`, `track_protocols.py`), `export_fields.py` and `animate_fields.py` show a progress
 line for the current loop: frames done, percent, elapsed time, ETA and, for tracking, the valid fraction
 and median ZNCC. `track_protocols.py` also numbers the deformations (`[3/9] Def13_…`). In a terminal the
-line updates in place; when output goes to a file (`nohup`, `> log.txt`, `| tee`, `run_pipeline.sh`)
-a full line is written every 30 s. `DIC_PROGRESS=lines` forces full lines and `DIC_PROGRESS=0` turns
-the line off.
+line updates in place; when output goes to a file (`nohup`, `> log.txt`, `| tee`) a full line is
+written every 30 s (`DIC_PROGRESS_EVERY` sets the interval). `DIC_PROGRESS=lines` forces full lines and
+`DIC_PROGRESS=0` turns the line off.
+
+`run_pipeline.sh` tracks each deformation as its own job with its own log, so the per-frame lines go to
+the logs (every 10 s). While tracking runs it prints a status line every 30 s (`--status N`; 0 turns it
+off) with the deformations finished and the percent done of each running one, and when tracking ends it
+prints the total tracking time.
