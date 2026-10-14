@@ -106,7 +106,7 @@ excluded tine pairs), tine spans, thickness, tracked deformations, J/mean figure
 
 ## Running the pipeline: `runDIC.sh`
 
-Runs every tracking step for the tests given, in order, with one log per step:
+Runs every step up to the constitutive fit for the tests given, in order, with one log per step:
 
 | Step | Script | Does |
 |---|---|---|
@@ -114,7 +114,7 @@ Runs every tracking step for the tests given, in order, with one log per step:
 | `config` | `make_config.py` | finds and refines the tine tips; with an existing config (`--update`) every other setting is kept |
 | `scale` | `calibrate_scale.py` | image scale from Def01 and Def19, leaving out `calibration_exclude` |
 | `widths` | `measure_tines.py --write` | tine spans → `widths_mm` |
-| `thickness` | `measure_thickness.py --write` | thickness from the photos in `<SAMPLE>/Thickness, <ID>/test <N>` → `thickness_mm`, in place of the workbook value (`thickness = auto`, the default), or only where there is no workbook value (`thickness = workbook`, `--thickness workbook`) |
+| `thickness` | `measure_thickness.py --write` | thickness for the stresses, from the photos in `<SAMPLE>/Thickness, <ID>/test <N>` → `thickness_mm`, in place of the workbook value (`thickness = auto`, the default), or only where there is no workbook value (`thickness = workbook`, `--thickness workbook`); runs before tracking, so its overlays can be checked while tracking runs |
 | `track` | `track_protocols.py` | Def11–Def19 against the common reference, one job per deformation, several at a time |
 | `artifacts` | `artifact_check.py` | finds local tracking errors (a sliding speckle particle, a shifting glare patch) at the Def11 peak, confirms each against independent patch matching, excludes it in `test_config.json` and tracks that test again |
 | `jfig` | `peak_j_figure.py` | peak J/mean figure per test |
@@ -179,7 +179,8 @@ track records `branch`, and `strain_tracking/status.py` marks loading-only track
 5. **Measure the tine spans:** `measure_tines.py --test SAMPLE/testN --write` → `widths_mm`.
 6. **Thickness:** `measure_thickness.py --recursive --write "<SAMPLE>/Thickness, <ID>"` measures the photos
    and writes each test's thickness, in place of the workbook value `make_config.py` entered
-   (`--keep-workbook`: workbook values stay, the photos fill only tests without one). Check its overlays.
+   (`--keep-workbook`: workbook values stay, the photos fill only tests without one). Only the stresses
+   (step 9) use it, but it runs here, before tracking, so its overlays can be checked while tracking runs.
 7. **Track:** `track_protocols.py --test SAMPLE/testN` (Def11–Def19; `--loading-only` for the loading
    branches only, which is all the fits use), then `artifact_check.py --test SAMPLE/testN`: if it adds an
    excluded region (exit status 3), track the test again.

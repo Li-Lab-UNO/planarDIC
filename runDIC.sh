@@ -49,8 +49,10 @@ Steps (in this order; --steps picks a subset, comma separated):
                                 of test_config.json are left out)
   widths   measure_tines.py     tine spans -> widths_mm in test_config.json
   thickness measure_thickness.py thickness from the photos in <SAMPLE>/Thickness*/test N -> thickness_mm,
-                                in place of the workbook value (thickness = auto), or only for tests
-                                without one (thickness = workbook / --thickness workbook)
+                                for the stresses of the constitutive fit (run afterwards); in place of the
+                                workbook value (thickness = auto), or only for tests without one
+                                (thickness = workbook / --thickness workbook). Runs before tracking, so its
+                                overlays can be checked while tracking runs
   track    track_protocols.py   Def11-Def19 against the common reference, one job per deformation
   artifacts artifact_check.py   find local tracking errors (sliding particles, glare) at the Def11 peak; when
                                 one is confirmed, exclude it in test_config.json and track the test again

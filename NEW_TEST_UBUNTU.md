@@ -125,10 +125,12 @@ percent (right panel). To choose the pairs yourself, add them to the config, for
 
 ## 5. Thickness
 
-The pipeline's `thickness` step measures the photos in `Thickness, 1900/test <N>` and writes `thickness_mm`
-into each test's config, in place of the workbook value (`thickness = auto` in `runDIC.ubuntu.ini`), or
-only where the workbook gives none (`thickness = workbook`, or `--thickness workbook` for one run). Its log
-lists the photos used and those left out, with the reason. To run it on its own:
+The thickness is needed only for the stresses (step 8), but it runs here, before tracking, so its overlays
+can be checked while tracking runs; it needs only the photos and the test's config. The pipeline's
+`thickness` step measures the photos in `Thickness, 1900/test <N>` and writes `thickness_mm` into each
+test's config, in place of the workbook value (`thickness = auto` in `runDIC.ubuntu.ini`), or only where
+the workbook gives none (`thickness = workbook`, or `--thickness workbook` for one run). Its log lists the photos used and those left out, with the reason.
+To run it on its own:
 
 ```bash
 ./runDIC.sh --steps thickness N1900
@@ -136,7 +138,8 @@ lists the photos used and those left out, with the reason. To run it on its own:
 
 Check the overlays in `Thickness, 1900/thickness_auto/test<N>/`: the yellow outline should follow the tissue
 around every strip, and every strip marked `*` (all, by default) should be a piece of the test's specimen
-(`strip_selection.json` in the photo folder can use one strip of a photo, or leave a photo out). See "Thickness from photos" in `README.md`.
+(`strip_selection.json` in the photo folder can use one strip of a photo, or leave a photo out). See
+"Thickness from photos" in `README.md`.
 
 ---
 
