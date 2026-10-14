@@ -31,7 +31,7 @@ constitutive_fit/
 | File | Purpose |
 |---|---|
 | `constitutive.py` | Four-fiber model: strain energy, plane-stress Cauchy stress for a general in-plane F, closed-form biaxial stress, and membrane first PK tension. `python constitutive.py` runs the self-checks |
-| `compare_stretch_inputs.py` | Fits the model for each global stretch input: CellScale 4-point, DIC 4-point, DIC region-mean λ, DIC affine F, DIC region edges, rake. Fits stay in the elastin-active family (C1_el > 0.1 kPa), with a protocol-level bootstrap. `fit_stress_stretch_<input>.png` (one per input) plots the measured Cauchy stress (symbols: circles axial, triangles circumferential) and the model at the same stretches (solid lines) for every protocol on one plot; the plotted curves are lightly smoothed (5-frame running median, then an 11-frame Savitzky–Golay filter), the fit uses the raw data. All the plots of a sample share their axis limits. Options: `--tracks tine_region` or `standard`, `--width tine_span` or `specimen`, `--table-only`, `--plot-only` (redraws the plots from the saved results), `--plot-input` (default: one plot per input) |
+| `compare_stretch_inputs.py` | Fits the model for each global stretch input: CellScale 4-point, DIC 4-point, DIC region-mean λ, DIC affine F, DIC region edges, rake. Fits stay in the elastin-active family (C1_el > 0.1 kPa), with a protocol-level bootstrap. `params_by_stretch_input.png` shows every parameter with its bootstrap interval, and each input's R² and RMSE in its key; `fit_stress_stretch_<input>.png` (one per input) plots the measured Cauchy stress (symbols: circles axial, triangles circumferential) and the model at the same stretches (solid lines) for every protocol on one plot; the plotted curves are lightly smoothed (5-frame running median, then an 11-frame Savitzky–Golay filter), the fit uses the raw data. All the plots of a sample share their axis limits. Options: `--tracks tine_region` or `standard`, `--width tine_span` or `specimen`, `--table-only`, `--plot-only` (redraws the plots from the saved results), `--plot-input` (default: one plot per input) |
 | `baseline.py` | `freeze` stores a frozen baseline: parameters, bootstrap 95% intervals, per-protocol errors, the exact data set, settings and checksums. `evaluate` scores any parameter set against it. Pass `tracks="tine_region"` for the primary baseline |
 | `check_preprocessing.py` | Sensitivity of a baseline to force taring and per-protocol Savitzky–Golay smoothing |
 | `fit_4pt.py` | Bulk fit to the CellScale 4-point tracking, with a frame-level bootstrap and a γ profile → `fit_4pt_*` |
@@ -53,7 +53,7 @@ constitutive_fit/
 
 ## Usage
 
-Fit one test (every stretch input, bootstrap, plots → `<test>/constitutive_fit/`):
+`./runDIC.sh` fits every test it runs (its `fit` step). Fit one test (every stretch input, bootstrap, plots → `<test>/constitutive_fit/`):
 
 ```bash
 .venv/bin/python constitutive_fit/compare_stretch_inputs.py --test N1739/test1

@@ -106,7 +106,7 @@ excluded tine pairs), tine spans, thickness, tracked deformations, J/mean figure
 
 ## Running the pipeline: `runDIC.sh`
 
-Runs every step up to the constitutive fit for the tests given, in order, with one log per step:
+Runs the whole analysis for the tests given, from sorting the images to the constitutive fit, in order, with one log per step:
 
 | Step | Script | Does |
 |---|---|---|
@@ -121,6 +121,7 @@ Runs every step up to the constitutive fit for the tests given, in order, with o
 | `exports` | `compare_cellscale.py`, `export_fields.py`, `animate_fields.py` | CellScale comparison, field exports and animations for Def11 |
 | `edge` | `edge_effects.py` | tine-effect check across the tests run |
 | `compare` | `compare_peak_j.py` | cross-test J/mean comparison of the samples run |
+| `fit` | `compare_stretch_inputs.py` | bulk four-fiber fit of each test (every stretch input, protocol-level bootstrap) → `<test>/constitutive_fit/`; tests without all of Def11–Def19 tracked or without `thickness_mm` are skipped, and the plots are redrawn at the end so a sample's plots share their axes |
 
 ```bash
 ./runDIC.sh N1739
@@ -194,8 +195,8 @@ track records `branch`, and `strain_tracking/status.py` marks loading-only track
    input, with a protocol-level bootstrap → `<test>/constitutive_fit/` (parameters, `fit_stress_stretch_<input>.png`).
    See `constitutive_fit/README.md`.
 
-Steps 2–8 are what `runDIC.sh` runs, in this order; step 9 is run on its own, one test at a time (the
-three tests of a sample can run at once, about 0.5–2 min each).
+Steps 2–9 are what `runDIC.sh` runs, in this order (the fits of a sample's tests run at once, about
+0.5–2 min each). To fit one test on its own, run step 9's command.
 
 ## Thickness from photos: `thickness/measure_thickness.py`
 

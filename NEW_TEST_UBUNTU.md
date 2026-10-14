@@ -4,8 +4,8 @@ Every command below is run from the project folder (the git clone, `~/Documents/
 Terminal.
 
 The examples use a sample **N1900_LFPA** and its **test1**; replace them with your own names.
-`./runDIC.sh` runs steps 3–7 in one command; the steps are listed separately so a single one
-can be rerun. The constitutive fit (step 8) is run on its own. Its defaults on this computer (tests, jobs, steps, ...) are in `runDIC.ubuntu.ini`.
+`./runDIC.sh` runs steps 3–8 in one command; the steps are listed separately so a single one
+can be rerun. Its defaults on this computer (tests, jobs, steps, ...) are in `runDIC.ubuntu.ini`.
 
 ---
 
@@ -179,8 +179,12 @@ a glare patch whose edges shift with load. When it confirms one, it excludes tha
 
 ## 8. Stresses and the constitutive fit
 
-`runDIC.sh` stops before fitting. Fit each test on its own (the tests of a sample can run at once, in
-separate terminals; about 0.5–2 min each):
+```bash
+./runDIC.sh --steps fit N1900
+```
+
+This fits every test of the sample at once (about 0.5–2 min each) and skips, with the reason, a test that
+doesn't have all of Def11–Def19 tracked or has no thickness. To fit one test directly:
 
 ```bash
 .venv/bin/python constitutive_fit/compare_stretch_inputs.py --test N1900/test1
@@ -196,15 +200,16 @@ and 95% intervals) and `fit_stress_stretch_<input>.png` (data and model, every p
 
 ---
 
-## Everything at once (steps 3–7)
+## Everything at once (steps 3–8)
 
 ```bash
 ./runDIC.sh --label "labeled healthy" N1900
 ```
 
 It asks before starting (`--yes` skips the question), writes logs to `DIC_logs/run_<date>_<time>/`
-in each test folder, and ends with a summary. Check `config_tine_tips.png`, `scale_calibration.png` and the
-thickness overlays afterwards, then fit each test (step 8).
+in each test folder, and ends with a summary that includes each test's fit (R² and RMSE). Check
+`config_tine_tips.png` and `scale_calibration.png`, the thickness overlays (ready about two minutes in,
+while tracking runs) and the fit plots.
 
 To see what each test has:
 

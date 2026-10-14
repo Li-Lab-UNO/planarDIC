@@ -303,7 +303,7 @@ def main():
         boots = np.array(boots)
         results[inp] = dict(best=best, R2=r2, rms=rms, lo=np.percentile(boots, 2.5, 0), hi=np.percentile(boots, 97.5, 0),
                             peak_z=float(lz.max()), peak_t=float(lt.max()), n_boot=len(boots), flipped=flipped)
-        print(f"{LABELS[inp]:20s} R2 {r2:.4f} RMS {rms:.2f} kPa | peak λz {lz.max():.3f} λθ {lt.max():.3f} | "
+        print(f"{LABELS[inp]:20s} R2 {r2:.4f} RMSE {rms:.2f} kPa | peak λz {lz.max():.3f} λθ {lt.max():.3f} | "
               f"bootstrap {len(boots)} kept, {flipped} elastin-off discarded | "
               + " ".join(f"{n}={v:.3g}" for n, v in zip(M.PARAM_NAMES, best)), flush=True)
 
@@ -352,7 +352,7 @@ def params_plot(T, out):
     protocol-level bootstrap 95% interval of every parameter, for each stretch input."""
     T = T.set_index("input")
     cols = {k: plt.get_cmap("tab10")(i) for i, k in enumerate(INPUTS)}
-    fig, ax = plt.subplots(2, 4, figsize=(17, 8.5), constrained_layout=True)
+    fig, ax = plt.subplots(2, 4, figsize=(17, 9.5), layout="constrained")
     for i, (n, u) in enumerate(zip(M.PARAM_NAMES, M.PARAM_UNITS)):
         a_ = ax.ravel()[i]
         for j, inp in enumerate(INPUTS):
@@ -360,6 +360,10 @@ def params_plot(T, out):
             a_.plot(j, T.loc[inp, n], "o", ms=7, color=cols[inp])
         a_.set_xticks(range(len(INPUTS))); a_.set_xticklabels([LABELS[k] for k in INPUTS], rotation=60, ha="right", fontsize=8)
         a_.set_title(f"{n} ({u})"); a_.grid(alpha=.3)
+    from matplotlib.lines import Line2D
+    fig.legend(handles=[Line2D([], [], ls="none", marker="o", ms=7, color=cols[k],
+                               label=f"{LABELS[k]}: R$^2$ {T.loc[k, 'R2']:.4f}, RMSE {T.loc[k, 'rms_kPa']:.2f} kPa")
+                        for k in INPUTS], loc="outside lower center", ncol=3, fontsize=9, title="fit of each stretch input")
     fig.suptitle("Fitted parameters by stretch input, elastin-active solution "
                  "(dots: best fit; bars: protocol-level bootstrap 95%)")
     fig.savefig(os.path.join(out, "params_by_stretch_input.png"), dpi=90)

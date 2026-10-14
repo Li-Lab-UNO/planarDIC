@@ -15,7 +15,7 @@ set -uo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$HERE"
 
-ALL_STEPS="sort config scale widths thickness track artifacts jfig exports edge compare"
+ALL_STEPS="sort config scale widths thickness track artifacts jfig exports edge compare fit"
 STEPS="$ALL_STEPS"
 DEFS="Def11 Def12 Def13 Def14 Def15 Def16 Def17 Def18 Def19"
 EXPORT_DEFS="Def11"
@@ -60,6 +60,9 @@ Steps (in this order; --steps picks a subset, comma separated):
   exports  compare_cellscale.py, export_fields.py, animate_fields.py for the --export-defs
   edge     edge_effects.py      tine-effect check across the tests given (all of Def11-Def19 tracked)
   compare  compare_peak_j.py    cross-test J/mean comparison for the samples given (same)
+  fit      compare_stretch_inputs.py  bulk four-fiber fit of each test, every stretch input, protocol
+                                bootstrap -> <test>/constitutive_fit/ (needs Def11-Def19 tracked and
+                                thickness_mm; the stresses use the thickness and the tine spans)
 
 Options:
   -s, --steps LIST         steps to run (default: all)
@@ -483,6 +486,33 @@ if has compare && [ ${#OK_TESTS[@]} -gt 0 ]; then
   SOFT=1 run compare "" "$PY" "$ST/compare_peak_j.py" --samples $OK_SAMPLES
 fi
 
+if has fit; then
+  step "constitutive fits (four-fiber model, every stretch input, protocol bootstrap)"
+  fit_one() {   # TEST: bulk fit -> <test>/constitutive_fit/
+    SOFT=1 run fit "$1" "$PY" "$HERE/constitutive_fit/compare_stretch_inputs.py" --test "$1"
+  }
+  export -f fit_one
+  FIT_TESTS=()
+  for t in "${TESTS[@]}"; do
+    if [ "$DRY" = 0 ]; then
+      [ -e "$(tlogdir "$t")/FAILED" ] && { echo "  skip  fit $(key "$t") (failed earlier)"; continue; }
+      all_tracked "$t" || { echo "  skip  fit $(key "$t"): not all of Def11-Def19 tracked"; continue; }
+      grep -q '"thickness_mm"' "$(dirname "$(dirname "$(tlogdir "$t")")")/test_config.json" 2>/dev/null \
+        || { echo "  skip  fit $(key "$t"): no thickness_mm in test_config.json"; continue; }
+    fi
+    FIT_TESTS+=("$t")
+  done
+  if [ "$DRY" = 1 ]; then
+    for t in "${FIT_TESTS[@]}"; do fit_one "$t"; done
+  elif [ ${#FIT_TESTS[@]} -gt 0 ]; then
+    printf '%s\n' "${FIT_TESTS[@]}" | xargs -P "$JOBS" -L 1 bash -c 'fit_one "$0"'
+    # redraw every plot once all the fits are done, so a sample's plots share their axis limits
+    for t in "${FIT_TESTS[@]}"; do
+      "$PY" "$HERE/constitutive_fit/compare_stretch_inputs.py" --test "$t" --plot-only > /dev/null 2>&1
+    done
+  fi
+fi
+
 [ "$DRY" = 1 ] && exit 0
 echo
 echo "== summary  ($(date +%H:%M:%S))"
@@ -493,6 +523,13 @@ if has track || has artifacts; then
       line=$(grep -h "valid per frame" "$f" | tail -1 | sed 's/; saved.*//;s/^ *//')
       echo "  $(key "$t") $(basename "$f" .log): ${line:-no result}"
     done
+  done
+fi
+if has fit; then
+  for t in "${TESTS[@]}"; do
+    f="$(tlogdir "$t")/fit.log"; [ -e "$f" ] || continue
+    line=$(grep -h "^DIC affine F" "$f" | head -1 | sed 's/ | peak.*//;s/  */ /g')
+    echo "  $(key "$t") fit: ${line:-no result}"
   done
 fi
 echo "logs: <test folder>/DIC_logs/run_$STAMP/"
