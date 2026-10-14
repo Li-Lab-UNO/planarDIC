@@ -494,6 +494,17 @@ def standard_from_full(R, trim=STANDARD_TRIM):
     return out
 
 
+def cell_corners(A):
+    """Corners (ny+1, nx+1) of the cells centered on a curvilinear grid A (ny, nx), e.g. the deformed grid's
+    x or y: the borders extrapolated linearly, then the mean of each 2 x 2 block. pcolormesh draws a deformed
+    grid seamlessly from these corners (shading="flat", edgecolors="face")."""
+    P = np.empty((A.shape[0] + 2, A.shape[1] + 2))
+    P[1:-1, 1:-1] = A
+    P[0, 1:-1], P[-1, 1:-1] = 2 * A[0] - A[1], 2 * A[-1] - A[-2]
+    P[:, 0], P[:, -1] = 2 * P[:, 1] - P[:, 2], 2 * P[:, -2] - P[:, -3]
+    return 0.25 * (P[:-1, :-1] + P[1:, :-1] + P[:-1, 1:] + P[1:, 1:])
+
+
 def load_track(results, folder, grid="tine_region"):
     """
     (track dict, path) for deformation `folder` on `grid` ("tine_region" or "standard"), from the

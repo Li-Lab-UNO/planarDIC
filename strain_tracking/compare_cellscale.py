@@ -206,17 +206,7 @@ h, w = img.shape[:2]
 qz, qt = D.specimen_mm(*np.vstack([P_cs[k_peak], P_cs[k_peak][:1]]).T, tips, MPP_)
 
 
-def cell_corners(A):
-    """Corners (ny+1, nx+1) of the cells centered on a curvilinear grid A (ny, nx): the borders extrapolated
-    linearly, then the mean of each 2 x 2 block (pcolormesh needs corners on a deformed grid)."""
-    P = np.empty((A.shape[0] + 2, A.shape[1] + 2))
-    P[1:-1, 1:-1] = A
-    P[0, 1:-1], P[-1, 1:-1] = 2 * A[0] - A[1], 2 * A[-1] - A[-2]
-    P[:, 0], P[:, -1] = 2 * P[:, 1] - P[:, 2], 2 * P[:, -2] - P[:, -3]
-    return 0.25 * (P[:-1, :-1] + P[1:, :-1] + P[:-1, 1:] + P[1:, 1:])
-
-
-Xe, Ye = cell_corners(Xd), cell_corners(Yd)
+Xe, Ye = D.cell_corners(Xd), D.cell_corners(Yd)
 
 fig, ax = plt.subplots(1, 3, figsize=(16, 6), constrained_layout=True)
 for i in range(3):

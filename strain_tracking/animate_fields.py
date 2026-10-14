@@ -53,7 +53,7 @@ SPEC = {
         ylabel="Green–Lagrange strain", mean_abs=False),
 }
 COLS = ["#1f77b4", "#d62728", "#2ca02c"]
-ALPHA = .72              # map opacity over the photo
+MAP_STYLE = dict(shading="flat", edgecolors="face", linewidth=0.3)   # opaque cells with filled edges: no seams
 
 ap = argparse.ArgumentParser(description=__doc__,
                              formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -214,8 +214,8 @@ def build(q):
     for i, ax in enumerate(axm):
         ims.append(ax.imshow(np.zeros((cy1 - cy0, cx1 - cx0, 3), np.uint8),
                              extent=(cx0, cx1, cy1, cy0)))
-        m = ax.pcolormesh(pos[0, :, 0].reshape(shape), pos[0, :, 1].reshape(shape), V[0, ..., i],
-                          cmap=cm[i], vmin=lims[i][0], vmax=lims[i][1], alpha=ALPHA, shading="nearest")
+        m = ax.pcolormesh(D.cell_corners(pos[0, :, 0].reshape(shape)), D.cell_corners(pos[0, :, 1].reshape(shape)),
+                          V[0, ..., i], cmap=cm[i], vmin=lims[i][0], vmax=lims[i][1], **MAP_STYLE)
         meshes.append(m)
         cbs.append(fig.colorbar(m, ax=ax, shrink=.85, pad=.02))
         ax.set_xlim(cx0, cx1); ax.set_ylim(cy1, cy0); ax.set_xticks([]); ax.set_yticks([])
@@ -228,9 +228,9 @@ def build(q):
         for i, ax in enumerate(axm):
             ims[i].set_data(img)
             meshes[i].remove()
-            meshes[i] = ax.pcolormesh(pos[k, :, 0].reshape(shape), pos[k, :, 1].reshape(shape),
-                                      V[k, ..., i], cmap=cm[i], vmin=lims[i][0], vmax=lims[i][1],
-                                      alpha=ALPHA, shading="nearest")
+            meshes[i] = ax.pcolormesh(D.cell_corners(pos[k, :, 0].reshape(shape)),
+                                      D.cell_corners(pos[k, :, 1].reshape(shape)),
+                                      V[k, ..., i], cmap=cm[i], vmin=lims[i][0], vmax=lims[i][1], **MAP_STYLE)
             cbs[i].update_normal(meshes[i])
             stat = "mean |·|" if sp["mean_abs"] and i < 2 else "mean"
             map_titles[i].set_text(f"{sp['labels'][i]}\n{stat} {fmt.format(mean[k, i])}")
