@@ -8,7 +8,7 @@ Writes next to the tracking .npz:
     <tag>_fields.mat   (MATLAB:  load(...))
     <tag>_fields_peak.png
 
-    ../.venv/bin/python export_fields.py ../N1739_LFPA/test1_08252026_PLC25_38-20/Images/Def11_Equibiaxial/strain_results/Def11_Equibiaxial_tine_region.npz
+    ../.venv/bin/python export_fields.py ../N1739_LFPA/test1_08252026_PLC25_38-20/DIC_results/Def11_Equibiaxial.npz
 
 Axes: image x = tester X = artery axial direction z (increasing right); circumferential
 direction theta increases UPWARD in the image (theta = -image y; dic2d.THETA_SIGN). Arrays are

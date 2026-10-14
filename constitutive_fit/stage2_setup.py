@@ -32,7 +32,7 @@ Checks:
     relative to the size of the terms. Evaluations only; nothing is fitted.
 
     ../.venv/bin/python stage2_setup.py --test N1739/test1 [--exclude-ring 1] [--every 4] [--modes 8] [--win 1]
-Outputs: Images/constitutive_fit/local/stage2_setup/
+Outputs: <test>/constitutive_fit/local/stage2_setup/
 """
 import argparse
 import json
@@ -54,7 +54,6 @@ import constitutive as M  # noqa: E402
 import dic2d as D  # noqa: E402
 from track_tine_region import SUFFIX, TINE_TIPS  # noqa: E402
 
-IMAGES = testcfg.get().images
 LOCAL = testcfg.get().local_dir
 
 
@@ -67,7 +66,7 @@ def measured_positions(df, frames, mpp, with_valid=False):
     for k in frames:
         fd, t = df.folder.iloc[k], round(float(df.t.iloc[k]), 1)
         if fd not in cache:
-            R = np.load(os.path.join(IMAGES, fd, "strain_results", fd + SUFFIX + ".npz"), allow_pickle=True)
+            R = np.load(os.path.join(testcfg.get().results, fd + SUFFIX + ".npz"), allow_pickle=True)
             cache[fd] = (R, {tt: i for i, tt in enumerate(np.round(R["times"], 1))}, tuple(R["shape"]))
         R, kmap, shape = cache[fd]
         p = R["pos"][kmap[t]].reshape(shape + (2,))[::-1]

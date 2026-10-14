@@ -16,7 +16,7 @@ native image px; radius is in the resampled px, and the npz records resample and
 
 Grid (--grid):
   tine_region (default)  the full domain: a lattice of the grid step centered between the rest-state
-                         tine tips (tine_tips_px) -> DefNN_*_tine_region.npz
+                         tine tips (tine_tips_px) -> DefNN_*.npz
   standard               the full domain without its outer two rows and columns -> DefNN_*.npz.
                          Usually not needed: dic2d.load_track(..., "standard") slices it from the
                          full-domain track.
@@ -29,7 +29,7 @@ Grid (--grid):
 dic2d.loading_end_time), about 55% of the frames. Tracking runs forward, so the loading frames are the
 same as in a full-cycle track; the unloading frames are left out (animations and CellScale comparisons
 then cover loading only). The npz records branch = "loading" or "full".
-Outputs: Images/DefNN_*/strain_results/DefNN_*[_tine_region].npz
+Outputs: <test>/DIC_results/DefNN_*[_standard].npz
 """
 import argparse
 import os
@@ -50,7 +50,7 @@ def run(T, defs=DEFAULT_DEFS, grid="tine_region", roi=None, step=None, radius=No
         out_dir=None, loading_only=False):
     """Track deformations `defs` of test T on `grid` against the common reference.
     step / radius (px) default to analysis_settings.json converted with the test's scale.
-    out_dir: write the .npz files there instead of each deformation's strain_results/ (for trials)."""
+    out_dir: write the .npz files there instead of the test's DIC_results/ (for trials)."""
     scale = D.load_scale(T.scale_file)
     if scale is None:
         sys.exit(f"{T.scale_file} missing: run calibrate_scale.py first")
@@ -104,7 +104,7 @@ def run(T, defs=DEFAULT_DEFS, grid="tine_region", roi=None, step=None, radius=No
         t = time.time()
         res = D.track_sequence(paths, X_start, prm, times=times, label=fd.split("_")[0])
         res["valid"] &= good[None, :]
-        out = os.path.join(out_dir or os.path.join(T.images, fd, "strain_results"), fd + D.GRID_SUFFIX[grid] + ".npz")
+        out = os.path.join(out_dir or T.results, fd + D.GRID_SUFFIX[grid] + ".npz")
         os.makedirs(os.path.dirname(out), exist_ok=True)
         # positions are saved in native image px (so every later script, the configs and the photos agree);
         # radius stays in the resampled px it was matched with

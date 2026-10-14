@@ -63,7 +63,7 @@ def peak_frame(R):
 
 
 def fields(T, defn, window_mm):
-    R, _ = D.load_track(T.images, T.folder(defn), "tine_region")
+    R, _ = D.load_track(T.results, T.folder(defn), "tine_region")
     X0, sh = R["X0"], tuple(R["shape"])
     mpp = D.load_scale(T.scale_file)["mm_per_px"]
     k = peak_frame(R)
@@ -134,7 +134,7 @@ def main():
         tips = T.setting("tine_tips_px")
         mpp = D.load_scale(T.scale_file)["mm_per_px"]
         spans = ((tips["z"][1] - tips["z"][0]) * mpp, (tips["theta"][1] - tips["theta"][0]) * mpp)
-        R0, _ = D.load_track(T.images, T.folder("Def11"), "tine_region")
+        R0, _ = D.load_track(T.results, T.folder("Def11"), "tine_region")
         inset = float(np.min([(R0["X0"][:, 0].min() - tips["z"][0]), (tips["z"][1] - R0["X0"][:, 0].max()),
                               (R0["X0"][:, 1].min() - tips["theta"][0]), (tips["theta"][1] - R0["X0"][:, 1].max())])) * mpp
         info[name] = dict(floor=inset + 2.5 * sigma, subset=float(R0.get("subset_mm", np.nan)),

@@ -24,7 +24,8 @@ can pass, so check the overlay.
 Written: sample, roi_px, tine_tips_px (median tip per rake), calibration_tines_px, reference_deformation;
 dic.mask_saturated (on when the tissue in the rest frame has saturated glints, off when it has none or is
 overexposed, >= 10% saturated) unless the config sets it; thickness_mm from the sample's thickness
-workbook (Thickness, <ID>/*.xlsx), if there is one and the config doesn't set it. widths_mm is left to
+workbook (Thickness, <ID>/*.xlsx), if there is one and the config doesn't set it (the pipeline's thickness
+step then replaces it with the photo measurement, unless thickness = workbook). widths_mm is left to
 measure_tines.py --write; when a config exists, --update
 replaces only the keys written here and keeps the rest, and a rake that fails the self-check starts from
 its existing tines. Finally every tip is refined with calibrate_scale.find_tip (the tip finder the scale
@@ -32,7 +33,7 @@ calibration applies frame by frame) and tine_tips_px is the median of the refine
 
     ../.venv/bin/python make_config.py --test N1757/test1 --label "labeled healthy"
     ../.venv/bin/python make_config.py --test N1739/test1 --out /tmp/check.json       (compare, no overwrite)
-Output: <test>/test_config.json (or --out) and <test>/Images/<Def11>/strain_results/config_tine_tips.png
+Output: <test>/test_config.json (or --out) and <test>/DIC_results/config_tine_tips.png
 """
 import argparse
 import glob
@@ -361,17 +362,18 @@ def main():
         th = thickness_from_workbook(T)
         if th:
             cfg["thickness_mm"] = th
-            print(f"thickness: H = {th['H']} mm, SD {th['H_sd']} mm ({th['source']})")
+            print(f"thickness: H = {th['H']} mm, SD {th['H_sd']} mm ({th['source']}); "
+                  "the thickness step replaces it with the photo measurement unless thickness = workbook")
         else:
             print(f"thickness: not set (no readings for {T.name.split('_')[0]} in "
                   f"{os.path.join(os.path.basename(os.path.dirname(T.root)), 'Thickness*', '*.xlsx')}); "
-                  "measure it with thickness/measure_thickness.py and add thickness_mm by hand")
+                  "the thickness step measures it from the photos")
     else:
         print(f"thickness: kept from the config (H = {cfg['thickness_mm'].get('H')} mm)")
     Tw = testcfg.Test(T.root)
     Tw.config_file = out_path
     Tw.write_config(cfg)
-    png = os.path.join(T.images, folder, "strain_results", "config_tine_tips.png")
+    png = os.path.join(T.results, "config_tine_tips.png")
     overlay(rgb, rakes, tips_px, png)
     print(f"tine_tips_px {tips_px}; saturated {sat:.2f}% of the tine region")
     for side, r in rakes.items():

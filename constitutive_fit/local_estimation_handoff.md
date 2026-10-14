@@ -33,8 +33,8 @@ Status: **Stage 0 (local data set and diagnostics) and Stage 1 (uniform-stress p
   - Images live in `Images/DefNN_*` folders.
   - Code lives at the project root `DIC/`: `DIC/strain_tracking/` (DIC) and `DIC/constitutive_fit/` (fits, including this file), with one shared `DIC/.venv`. Sample folders (`N1739_LFPA/`, `N1690_RFPA/`) sit next to them.
   - Every script needs `--test SAMPLE/testN`, e.g. `--test N1739/test1` (or `DIC_TEST`); test-specific settings are in `<test>/test_config.json`.
-  - Per-protocol results go in `Images/DefNN_*/strain_results/`.
-  - Constitutive results go in `Images/constitutive_fit/`.
+  - Tracks and per-protocol results go in `<test>/DIC_results/`, named by deformation.
+  - Constitutive results go in `<test>/constitutive_fit/`.
 
 ## 2. Paths
 
@@ -47,13 +47,13 @@ Test root: `N1739_LFPA/test1_08252026_PLC25_38-20/` (relative to the project fol
 | Raw forces and rake size | `ID_N1739_LFPA_PLC25 38-20_08.25.2026_test1Data.csv` (`Time_S`, `X_Force_mN`, `Y_Force_mN`, `X_Size_um`, `Y_Size_um`; latin1 encoding) |
 | CellScale 4-point tracking | `Coords1.csv` (skip 1 row; X1..Y4; TL, TR, BR, BL = points 1, 3, 4, 2) |
 | Phase timing | `Logs/*_PhaseTiming.csv` (Stretch and Recover start times; the loading branch ends at the rake peak, see §5) |
-| DIC tracks, full domain | `Images/Def1[1-9]_*/strain_results/Def1N_*_tine_region.npz` |
-| DIC tracks, original ROI | `Images/Def1[1-9]_*/strain_results/Def1N_*.npz` |
-| Bulk baseline, full domain (primary) | `Images/constitutive_fit/baseline_tine_region/` |
-| Bulk baseline, original ROI (reference) | `Images/constitutive_fit/baseline/` |
-| Local data set and Stage 0 figures | `Images/constitutive_fit/local/` |
-| Stage 1 results | `Images/constitutive_fit/local/stage1*/` (with and without the outer ring; with a smoothness penalty) |
-| Segmentation | `Images/constitutive_fit/local/segmentation/` |
+| DIC tracks, full domain | `DIC_results/Def1N_*.npz` |
+| DIC tracks, original ROI | `DIC_results/Def1N_*_standard.npz` (sliced from the full-domain track when not tracked separately) |
+| Bulk baseline, full domain (primary) | `constitutive_fit/baseline/` |
+| Bulk baseline, original ROI (reference) | `constitutive_fit/standard_roi/baseline/` |
+| Local data set and Stage 0 figures | `constitutive_fit/local/` |
+| Stage 1 results | `constitutive_fit/local/stage1*/` (with and without the outer ring; with a smoothness penalty) |
+| Segmentation | `constitutive_fit/local/segmentation/` |
 | Thickness measurements | `N1739_LFPA/Thickness, 1739/Thickess measurements.xlsx` (sic); the values used are in `test_config.json` |
 
 ## 3. DIC tracks
@@ -92,7 +92,7 @@ Two sets of tracks exist for Def11–Def19. Both use the same settings and the s
 | Module | Relevant API |
 |---|---|
 | `dic2d.py` | `deformation_gradient_field(X0, x, valid, shape, win, min_frac=0.5, fill_holes=True)` → (F[rows, cols, 2, 2] in image frame, ok mask); `to_specimen(F)`; `THETA_SIGN`; `affine_fit`, `bilinear_F_center`, `green_lagrange`, `window_points`, `load_scale`; name constants `STRAIN_KEYS`, `STRETCH_KEYS`, `DISP_KEYS`, `F_KEYS`, `FORCE_KEYS`, `AXIS_CONVENTION` |
-| `constitutive.py` | `PARAM_NAMES = (Cgr, C1_el, C2_el, C1_smc, C2_smc, C1_col, C2_col, gamma_deg)`; `cauchy(F, P)` for a **general in-plane F** (shear allowed, incompressible, plane stress); `cauchy_biaxial(lz, lt, P)` closed form; `first_pk_membrane(F, P, H)` → N = H·t·F^-T (kPa·mm = N/m); Div N = 0 on the reference grid |
+| `constitutive.py` | `PARAM_NAMES = (Cgr, C1_el, C2_el, C1_smc, C2_smc, C1_col, C2_col, gamma)` (gamma in degrees); `cauchy(F, P)` for a **general in-plane F** (shear allowed, incompressible, plane stress); `cauchy_biaxial(lz, lt, P)` closed form; `first_pk_membrane(F, P, H)` → N = H·t·F^-T (kPa·mm = N/m); Div N = 0 on the reference grid |
 | `compare_stretch_inputs.py` | `build_table(sets, tracks="standard" \| "tine_region")` (protocol → folder mapping, loading-branch frames, tare); `fit(lz, lt, tzz, ttt, starts, rng, seeds=())`, the multi-start elastin-active fit; bounds `LO`/`HI`; `EL_MIN = 0.1`; `WIDTHS` from the test's `widths_mm` (test1: tine span 9.57 / 9.02 mm, specimen 15.4 / 13.4 mm). CLI: `--tracks`, `--table-only` (writes the stretch table, no fitting) |
 | `baseline.py` | `load(tracks="standard" \| "tine_region")` (checks the checksum) → (baseline dict, data DataFrame); `evaluate(params, input="dic_affine", tracks=...)` → R2, RMS and per-protocol RMS on the frozen data, with an "outside 95%" flag per parameter. The default `tracks` is `"standard"` (original ROI), so local work must pass `tracks="tine_region"` |
 | `track_tine_region.py` | full-domain tracking; `ROI`, `TINE_TIPS` (from the test's `test_config.json`), `SUFFIX` |
@@ -108,8 +108,8 @@ Two sets of tracks exist for Def11–Def19. Both use the same settings and the s
 
 The bulk baseline has been fitted two ways, which differ only in the DIC tracks behind the global stretches:
 
-- **Full domain** (`baseline_tine_region/`): tracks out to the tine tips. This is the **primary comparison target**, because its domain matches the local data set.
-- **Original ROI** (`baseline/`): tracks over the inner ~87% of the gap between the tine tips. It is kept as a reference.
+- **Full domain** (`baseline/`): tracks out to the tine tips. This is the **primary comparison target**, because its domain matches the local data set.
+- **Original ROI** (`standard_roi/baseline/`): tracks over the inner ~87% of the gap between the tine tips. It is kept as a reference.
 
 Everything else is identical. Both use the same 1492 loading frames, the same tared forces and the same fit settings (below). A parameter set must be scored on the baseline built from the same domain: the original-ROI parameters scored on the full-domain data give RMS 0.569 kPa rather than 0.431 kPa.
 
@@ -149,7 +149,7 @@ Each baseline folder holds:
 | C2_smc | 10.457 | 9.01 – 10.99 | 10.747 | 9.13 – 11.49 |
 | C1_col (kPa) | 1.103 | 0.65 – 1.92 | 1.318 | 0.74 – 2.10 |
 | C2_col | 7.950 | 5.37 – 8.73 | 7.723 | 5.50 – 8.58 |
-| gamma_deg | 46.31 | 31.3 – 48.6 | 47.66 | 32.0 – 49.4 |
+| gamma (deg) | 46.31 | 31.3 – 48.6 | 47.66 | 32.0 – 49.4 |
 | R2 / RMS (kPa) | 0.9978 / 0.431 | | 0.9977 / 0.437 | |
 
 Every full-domain parameter lies inside the original-ROI 95% interval. The largest relative shifts are in the two least constrained parameters: C1_el (+15%) and C1_col (−16%).
@@ -230,7 +230,7 @@ CellScale 4-point and rake don't depend on the DIC domain, so they are identical
 
 ### Stage 0: local data set and diagnostics (done)
 
-`build_local_data.py` writes `Images/constitutive_fit/local/`:
+`build_local_data.py` writes `constitutive_fit/local/`:
 
 - **`local_data.npz`:**
   - F in the specimen frame for each of the 1492 baseline frames, on the 41 × 36 grid. Layout [row, col] = [θ, z], with row 0 at the bottom tine tips and col 0 at the left tine tips.

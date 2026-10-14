@@ -6,7 +6,7 @@ Status of every test folder: what has been set up, tracked and exported, read fr
     ../.venv/bin/python status.py --notes         also print each test's notes from test_config.json
 
 Columns: sorted (DefNN folders), config (test_config.json), scale (px/mm; excluded tine pairs),
-widths (w_theta / w_z tine spans, mm), H (thickness, mm), tracked (deformations with a full-domain
+widths (w_theta / w_z tine spans, mm), H (thickness, mm, from the photos or the workbook), tracked (deformations with a full-domain
 track among Def11-Def19; "loading only" marks track_protocols.py --loading-only tracks), J/mean (peak_J_over_mean figure), exports (deformations with
 *_fields.npz).
 """
@@ -51,10 +51,12 @@ def row(td):
     T = testcfg.Test(td)
     img = T.images
     folders = sorted(d for d in os.listdir(img) if re.match(r"Def\d\d_", d)) if os.path.isdir(img) else []
-    tracks = {d: glob.glob(os.path.join(img, d + "_*", "strain_results", d + "_*_tine_region.npz")) for d in DEFS}
+    res = T.results
+    tracks = {d: [p for f in folders if f.startswith(d + "_") for p in [os.path.join(res, f + ".npz")]
+                  if os.path.exists(p)] for d in DEFS}
     tracked = [d for d in DEFS if tracks[d]]
     loading = [d for d in tracked if branch(tracks[d][0]) == "loading"]
-    exported = [d for d in DEFS if glob.glob(os.path.join(img, d + "_*", "strain_results", d + "_*_fields.npz"))]
+    exported = [d for d in DEFS if glob.glob(os.path.join(res, d + "_*_fields.npz"))]
     cfg = T.config
     sc = json.load(open(T.scale_file)) if os.path.exists(T.scale_file) else None
     scale = "-"
@@ -63,14 +65,17 @@ def row(td):
         if cfg.get("calibration_exclude"):
             scale += f" (excl. {', '.join(cfg['calibration_exclude'])})"
     w = cfg.get("widths_mm", {}).get("tine_span")
-    H = cfg.get("thickness_mm", {}).get("H")
+    th = cfg.get("thickness_mm", {})
+    H = th.get("H")
+    Hsrc = "" if not H else " photos" if str(th.get("source", "")).startswith("measure_thickness") \
+        else " workbook" if ".xls" in str(th.get("source", "")) else " other"
     return dict(test=f"{T.sample.split('_')[0]}/{T.name.split('_')[0]}",
                 sorted=f"{len(folders)} folders" if folders else "no",
                 config="yes" if cfg else "no", scale=scale,
-                widths=f"{w[0]:.2f} / {w[1]:.2f}" if w else "-", H=f"{H:.2f}" if H else "-",
+                widths=f"{w[0]:.2f} / {w[1]:.2f}" if w else "-", H=f"{H:.2f}{Hsrc}" if H else "-",
                 tracked=def_range(tracked) + (" (loading only)" if loading and loading == tracked
                                               else f" ({def_range(loading)} loading only)" if loading else ""),
-                jmean="yes" if os.path.exists(os.path.join(img, "peak_J_over_mean_Def11-19.png")) else "no",
+                jmean="yes" if os.path.exists(os.path.join(res, "peak_J_over_mean_Def11-19.png")) else "no",
                 exports=def_range(exported), notes=cfg.get("notes", []), label=cfg.get("sample", ""))
 
 

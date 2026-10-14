@@ -10,7 +10,7 @@ separation, with the calibration result as a line (its slope is px per mm), and 
 from that line vs rake force.
 
     ../.venv/bin/python animate_calibration.py --test N1690/test2 --def Def01 --pair X3
-Output: <test>/Images/<Def>/strain_results/scale_calibration_<pair>.mp4
+Output: <test>/DIC_results/<Def>_scale_calibration_<pair>.mp4
 """
 import argparse
 import json
@@ -174,7 +174,7 @@ def main():
         fig.canvas.draw()
         return np.asarray(fig.canvas.buffer_rgba())[..., :3].copy()
 
-    out = os.path.join(TC.images, folder, "strain_results", f"scale_calibration_{a.pair}.mp4")
+    out = os.path.join(TC.results, f"{folder.split('_')[0]}_scale_calibration_{a.pair}.mp4")
     os.makedirs(os.path.dirname(out), exist_ok=True)
     writer = imageio.get_writer(out, fps=a.fps, codec="libx264", quality=8, macro_block_size=4)
     for k in range(len(paths)):

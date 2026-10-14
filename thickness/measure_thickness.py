@@ -23,15 +23,33 @@ tissue band in the photo. For each image the script:
     .venv/bin/python thickness/measure_thickness.py IMG.JPG --background ruler --ruler-tick-mm 1
     .venv/bin/python thickness/measure_thickness.py "N1690_RFPA/Thickness, 1690" --recursive
 
-Writes <image folder>/thickness_auto/: an overlay PNG per image, a per-station CSV per
-strip, and summary.csv (one row per strip). `selected` marks the strip each photo is for:
-the one nearest the frame center, unless <image folder>/strip_selection.json says otherwise
-({"DSC00503.jpg": "lower"}; upper, lower, left, right or center).
+Writes the results of a photo folder <SAMPLE>/Thickness, <ID>/test <N> to <SAMPLE>/Thickness, <ID>/thickness_auto/test<N>/
+(any other image folder: <image folder>/thickness_auto/): an overlay PNG per image, a per-station CSV per strip, and
+summary.csv (one row per strip).
+
+--write puts the result into the test's test_config.json as thickness_mm, for each photo folder
+<SAMPLE>/Thickness, <ID>/test <N>: H and H_sd are the mean and SD of all stations of the selected
+strips of the folder's photos whose scale is reliable (as compare_manual.py pools them); one such photo
+is enough, and the output lists the photos used and every photo left out, with the reason (excluded,
+failed, no strip found, scale uncertain). It replaces a workbook value (make_config.py), which is kept in
+thickness_mm.workbook for comparison. With --keep-workbook, a workbook value stays in use (and one kept
+in thickness_mm.workbook is put back); the photos then fill only tests without one. When no photo gives
+a thickness, the config keeps what it has.
+
+    .venv/bin/python thickness/measure_thickness.py --recursive --write "N1757_LFPA/Thickness, 1757"
+    .venv/bin/python thickness/measure_thickness.py --recursive --write --keep-workbook "N1739_LFPA/Thickness, 1739"
+
+`selected` marks the strips each photo is for: every complete strip (the strips in a test's photos are
+pieces of its specimen), unless <image folder>/strip_selection.json names one by position
+({"DSC00503.jpg": "lower"}; upper, lower, left, right or center; "exclude" leaves a photo out).
+A strip much fainter against its background than the photo's strongest strip (STRIP_CONTRAST_FRAC) is
+dropped as stained mat or a film, and the drop is printed.
 """
 import argparse
 import glob
 import json
 import os
+import re
 import sys
 
 import cv2
@@ -44,7 +62,9 @@ from scipy import ndimage as ndi  # noqa: E402
 from scipy.signal import find_peaks, savgol_filter  # noqa: E402
 from scipy.sparse import coo_matrix  # noqa: E402
 from scipy.sparse.csgraph import dijkstra  # noqa: E402
-from skimage.morphology import skeletonize  # noqa: E402
+from scipy.spatial import cKDTree  # noqa: E402
+from skimage.morphology import reconstruction, skeletonize  # noqa: E402
+from skimage.segmentation import watershed  # noqa: E402
 
 MM_PER_IN = 25.4
 DS = 4              # downsampling for scale detection
@@ -55,6 +75,20 @@ CLOSE_MM = 0.4      # closing radius: joins the medial and adventitial layers ac
 MIN_AREA_MM2 = 3.0  # smallest tissue blob kept
 RULER_TISSUE_PCT = 75   # on the ruler: tissue brightness = this percentile of the pixels brighter than the steel
 RULER_EDGE_FRAC = 0.6   # ... and the tissue edge this fraction of the way from the steel's brightness to it
+# On the mat the threshold mask (warm and bright) holds the confident tissue; each strip is then grown into the rest
+# of its tissue (pale layers, a darker or shaded side, blurred edges), judged against the mat around it:
+STRIP_CONTRAST_FRAC = 0.5   # a strip stands out from its local background at least this fraction as much as the photo's
+                            # strongest strip (fainter ones are stained mat or films, dropped and reported)
+SEED_WARM_MAX = 25   # on the mat, confident tissue is at most this much warmer (b*) than the mat need be
+GROW_FRAC = 0.5      # brighter pixels: differ from the local mat by at least this fraction of the strip core's contrast
+GROW_MM = 0.75       # growth reaches at most this far from the confident tissue
+SEED_MIN_MM2 = 0.3   # confident pieces this large take part (smaller ones are specks)
+BRIDGE_MM = 3.0      # pieces of one strip this close are joined when tissue-colored all along the gap ...
+BRIDGE_FRAC = 0.5    # ... (every point within 0.3 mm of the path at least this fraction of the core contrast)
+CORRIDOR_MM = 1.0    # ... by growing inside a corridor of this half-width
+RING_MM = (1.5, 3.0) # the local mat: a ring this far around each piece, away from other tissue
+LINE_MM = 2.5        # printed grid lines: warm straight runs at least this long along a grid direction
+CHUNK_MM, CUT_CHUNKS = 1.0, 3   # growth may not join parts of a piece more than CUT_CHUNKS x CHUNK_MM apart along it
 STEP_MM = 0.1       # station spacing along the centerline
 TRIM_FRAC = 0.10    # fraction of centerline length dropped at each end
 SMOOTH_MM = 1.0     # centerline smoothing window, at least ...
@@ -326,11 +360,12 @@ def detect_background(img):
 
 # ---------------------------------------------------------------- segmentation
 
-def tissue_mask(img, px_mm, use_L=True, ruler_poly=None):
+def tissue_mask(img, px_mm, use_L=True, ruler_poly=None, grid_angles=None):
     """Binary tissue mask at WORK_PX_MM px/mm, and the resampling factor. use_L adds the
     brightness test (blue mat); on the ruler the white board is as bright as tissue, so
     tissue is found by b* off the ruler and by brightness alone on it (ruler_poly, full-res px): the edge
-    on the steel is RULER_EDGE_FRAC of the way from the steel's brightness to the tissue's."""
+    on the steel is RULER_EDGE_FRAC of the way from the steel's brightness to the tissue's. On the mat
+    (use_L) the result is refined by grow_on_mat (grid_angles: the grid's line directions from grid_scale)."""
     f = WORK_PX_MM / px_mm
     im = cv2.resize(img, None, fx=f, fy=f, interpolation=cv2.INTER_AREA)
     lab = cv2.cvtColor(im, cv2.COLOR_BGR2LAB).astype(np.float32)
@@ -341,7 +376,10 @@ def tissue_mask(img, px_mm, use_L=True, ruler_poly=None):
     bg_b, bg_L = np.median(bst), np.median(L)
     sb = 1.4826 * np.median(np.abs(bst - bg_b)) + 1
     sL = 1.4826 * np.median(np.abs(L - bg_L)) + 1
-    seed = (bst > bg_b + max(15, 4 * sb)) & ((not use_L) | (L > bg_L + max(20, 3 * sL)))
+    # warmer than the mat by 4 of its spreads, at most SEED_WARM_MAX on the mat: a stained, patchy mat has a wide
+    # spread, and the brightness test keeps the (warm, not bright) printed lines out
+    warm_min = max(15, 4 * sb) if not use_L else min(max(15, 4 * sb), SEED_WARM_MAX)
+    seed = (bst > bg_b + warm_min) & ((not use_L) | (L > bg_L + max(20, 3 * sL)))
     if seed.sum() < 0.5 * WORK_PX_MM ** 2:
         raise RuntimeError("no tissue found")
     # tissue level from the seeds, leaving out near-saturated glare, which would set the
@@ -373,7 +411,160 @@ def tissue_mask(img, px_mm, use_L=True, ruler_poly=None):
         sizes = ndi.sum(holes, hl, range(1, nh + 1))
         small_h = np.isin(hl, 1 + np.nonzero(sizes < 1.0 * WORK_PX_MM ** 2)[0])
         m[small_h] = 1
+    if use_L:
+        m = grow_on_mat(m, cv2.cvtColor(im, cv2.COLOR_BGR2LAB).astype(np.float32), grid_angles or [])
     return m, f, bst, thr
+
+
+def _disk(r):
+    r = max(1, int(round(r)))
+    return cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * r + 1, 2 * r + 1))
+
+
+def _tissue_like(lab, bg, C, core):
+    """Pixels that look like a strip's tissue against the local mat (bg): brighter than the mat and differing from it
+    by at least GROW_FRAC of the core's contrast C (the edge half-way through a blurred step), or darker than the mat
+    but warm (b* at least half-way from the mat's to the core's): darker layers and the strip's shaded side. Printed
+    grid lines are not darker than the mat (or are found by _grid_lines), and shadows on the blue mat are not warm."""
+    dE = np.linalg.norm(lab - bg, axis=-1)
+    bright = (lab[..., 0] > bg[0]) & (dE >= GROW_FRAC * C)
+    dark_warm = (lab[..., 0] <= bg[0]) & (lab[..., 2] >= bg[2] + 0.5 * max(core[2] - bg[2], 10))
+    return bright | dark_warm
+
+
+def _grid_lines(lab, angles, seeds):
+    """The mat's printed grid lines near the strips: warm pixels in straight runs of at least LINE_MM along a grid
+    direction, found where no tissue is (beyond the seeds' growth zone) and continued along the line into that zone."""
+    W = WORK_PX_MM
+    warm = (lab[..., 2] > np.median(lab[..., 2]) + 8).astype(np.uint8)
+    warm[cv2.dilate(seeds, _disk((GROW_MM + 0.25) * W)) > 0] = 0
+    out = np.zeros(warm.shape, np.uint8)
+    for a in angles:
+        def kernel(mm):
+            n = int(mm * W) | 1
+            k = np.zeros((n, n), np.uint8)
+            c = n // 2
+            dx, dy = np.cos(np.radians(a)) * c, np.sin(np.radians(a)) * c
+            cv2.line(k, (int(round(c - dx)), int(round(c - dy))), (int(round(c + dx)), int(round(c + dy))), 1, 1)
+            return k
+        runs = cv2.morphologyEx(warm, cv2.MORPH_OPEN, kernel(LINE_MM))
+        out |= cv2.dilate(runs, kernel(2 * (GROW_MM + 0.5)))
+    return cv2.dilate(out, _disk(2)) > 0
+
+
+def _keep_topology(out, lc, pieces):
+    """Cut the mask where growth from parts of one piece that lie far apart along it met (e.g. the two ends of a
+    C-shaped strip): seed pixels are labeled by CHUNK_MM chunks of their piece's centerline, every mask pixel takes
+    the label of the nearest seed (geodesically), and pixels between labels of one piece more than CUT_CHUNKS apart
+    are removed (a 0.2 mm cut)."""
+    W = WORK_PX_MM
+    markers = np.zeros(out.shape, np.int32)
+    piece, pos = [0], [0]
+    for k in pieces:
+        comp = lc == k
+        if comp.sum() < 50:
+            continue
+        cl = centerline(comp)
+        s_arc = np.r_[0, np.cumsum(np.hypot(*np.diff(cl, axis=0).T))]
+        ys, xs = np.nonzero(comp)
+        _, j = cKDTree(cl).query(np.c_[ys, xs])
+        chunk = (s_arc[j] // (CHUNK_MM * W)).astype(int)
+        for c in np.unique(chunk):
+            markers[ys[chunk == c], xs[chunk == c]] = len(piece)
+            piece.append(k)
+            pos.append(c)
+    if len(piece) == 1:
+        return out
+    piece, pos = np.array(piece), np.array(pos)
+    lab = watershed(np.zeros(out.shape, np.float32), markers, mask=out.astype(bool))
+    cut = np.zeros(out.shape, bool)
+    for dy, dx in ((0, 1), (1, 0)):
+        a, b = lab[:lab.shape[0] - dy, :lab.shape[1] - dx], lab[dy:, dx:]
+        far = (a > 0) & (b > 0) & (piece[a] == piece[b]) & (np.abs(pos[a] - pos[b]) > CUT_CHUNKS)
+        cut[:lab.shape[0] - dy, :lab.shape[1] - dx] |= far
+        cut[dy:, dx:] |= far
+    cut = cv2.dilate(cut.astype(np.uint8), _disk(0.1 * W)) > 0
+    out = out.copy()
+    out[cut & (markers == 0)] = 0
+    return out
+
+
+def grow_on_mat(m0, lab, grid_angles):
+    """Grow the mat's threshold mask m0 (the confident tissue) into the rest of each strip's tissue.
+    Pieces of at least MIN_AREA_MM2, and smaller pieces bridged to them, are strip pieces; isolated small pieces
+    (printed numerals, ruler ticks, specks) stay as they are. Each strip piece is judged against the mat in a ring
+    around it (RING_MM) and its own core color: it grows up to GROW_MM into connected _tissue_like pixels, staying out
+    of printed grid lines. Pieces within BRIDGE_MM whose gap is tissue-colored all along are joined inside a
+    corridor (a strip whose faint middle the threshold mask lost). Where a grid line crosses a strip, the line is
+    filled between tissue on both sides; growth never joins far-apart parts of one piece (_keep_topology)."""
+    W = WORK_PX_MM
+    lab = np.stack([cv2.GaussianBlur(c, (0, 0), 1.0) for c in cv2.split(lab)], -1)
+    lc, n = ndi.label(m0)
+    if n == 0:
+        return m0
+    sizes = ndi.sum(m0, lc, range(1, n + 1))
+    seeds = np.isin(lc, 1 + np.nonzero(sizes >= SEED_MIN_MM2 * W * W)[0]).astype(np.uint8)
+    near_any = cv2.dilate(seeds, _disk(RING_MM[0] * W)) > 0
+    lines = _grid_lines(lab, grid_angles, seeds) if grid_angles else np.zeros(m0.shape, bool)
+    lc, n = ndi.label(seeds)
+    info, box, pts = {}, {}, {}
+    for k in range(1, n + 1):
+        ys, xs = np.nonzero(lc == k)
+        pad = int((RING_MM[1] + 1) * W)
+        y0, y1, x0, x1 = max(ys.min() - pad, 0), ys.max() + pad, max(xs.min() - pad, 0), xs.max() + pad
+        cc = (lc[y0:y1, x0:x1] == k).astype(np.uint8)
+        Lw = lab[y0:y1, x0:x1]
+        ring = (cv2.dilate(cc, _disk(RING_MM[1] * W)) > 0) & ~near_any[y0:y1, x0:x1]
+        if ring.sum() < 100:
+            continue
+        bg = np.median(Lw[ring], 0)
+        er = cv2.erode(cc, _disk(3)) > 0
+        core = np.median(Lw[er if er.any() else cc > 0], 0)
+        info[k], box[k], pts[k] = (bg, float(np.linalg.norm(core - bg)), core), (y0, y1, x0, x1), np.c_[ys, xs]
+    big = {k for k in info if len(pts[k]) >= MIN_AREA_MM2 * W * W}
+    bridges, strip_pieces = [], set(big)
+    keys = sorted(info)
+    for i, a in enumerate(keys):
+        for b in keys[i + 1:]:
+            if a not in big and b not in big:
+                continue
+            A, B = pts[a][::max(1, len(pts[a]) // 400)], pts[b][::max(1, len(pts[b]) // 400)]
+            dd = np.linalg.norm(A[:, None, :] - B[None, :, :], axis=-1)
+            ia, ib = np.unravel_index(np.argmin(dd), dd.shape)
+            if dd[ia, ib] > BRIDGE_MM * W:
+                continue
+            pa, pb = A[ia].astype(float), B[ib].astype(float)
+            bg, C = (info[a][0] + info[b][0]) / 2, min(info[a][1], info[b][1])
+            core = (info[a][2] + info[b][2]) / 2
+            r = int(0.3 * W)
+            ok = all(np.linalg.norm(lab[max(y - r, 0):y + r + 1, max(x - r, 0):x + r + 1] - bg, axis=-1).max()
+                     >= BRIDGE_FRAC * C
+                     for y, x in (np.round(pa + t * (pb - pa)).astype(int) for t in np.linspace(0, 1, int(dd[ia, ib]) + 1)))
+            if ok:
+                bridges.append((pa, pb, bg, C, core))
+                strip_pieces |= {a, b}
+    out = m0.copy()
+    for k in strip_pieces:
+        y0, y1, x0, x1 = box[k]
+        cc = (lc[y0:y1, x0:x1] == k).astype(np.uint8)
+        bg, C, core = info[k]
+        allowed = (_tissue_like(lab[y0:y1, x0:x1], bg, C, core) & ~lines[y0:y1, x0:x1]
+                   & (cv2.dilate(cc, _disk(GROW_MM * W)) > 0)) | (cc > 0)
+        out[y0:y1, x0:x1] |= reconstruction(cc, allowed.astype(np.uint8), method="dilation").astype(np.uint8)
+    for pa, pb, bg, C, core in bridges:
+        corridor = np.zeros(out.shape, np.uint8)
+        cv2.line(corridor, (int(pa[1]), int(pa[0])), (int(pb[1]), int(pb[0])), 1, int(2 * CORRIDOR_MM * W))
+        allowed = (_tissue_like(lab, bg, C, core) & ~lines & (corridor > 0)) | (out > 0)
+        out = reconstruction(out, allowed.astype(np.uint8), method="dilation").astype(np.uint8)
+    out |= ((cv2.morphologyEx(out, cv2.MORPH_CLOSE, _disk(0.6 * W)) > 0) & lines).astype(np.uint8)
+    out = cv2.morphologyEx(out, cv2.MORPH_OPEN, _disk(OPEN_MM * W))
+    out = cv2.morphologyEx(out, cv2.MORPH_CLOSE, _disk(CLOSE_MM * W))
+    holes = ndi.binary_fill_holes(out) & ~out.astype(bool)
+    hl, nh = ndi.label(holes)
+    if nh:
+        hs = ndi.sum(holes, hl, range(1, nh + 1))
+        out[np.isin(hl, 1 + np.nonzero(hs < 1.0 * W ** 2)[0])] = 1
+    return _keep_topology(out, lc, strip_pieces)
 
 
 def strip_components(m):
@@ -507,8 +698,9 @@ def _crossing_chords(st):
 
 def process(path, background="auto", grid_in=0.5, ruler_tick_mm=None, px_per_mm=None, outdir=None,
             pick=None):
-    """Measure every complete strip in one photo. pick chooses the strip the photo is
-    for: center (default, nearest the frame center), upper, lower, left or right."""
+    """Measure every complete strip in one photo. pick chooses the strips the photo is
+    for: all (default; the strips are pieces of the test's specimen), or one by position: center
+    (nearest the frame center), upper, lower, left or right."""
     img = cv2.imread(path)
     if img is None:
         raise RuntimeError(f"cannot read {path}")
@@ -523,7 +715,9 @@ def process(path, background="auto", grid_in=0.5, ruler_tick_mm=None, px_per_mm=
 
     def segment():
         m, f, _, _ = tissue_mask(img, scale["px_per_mm"], use_L=(bg == "grid"),
-                                 ruler_poly=scale.get("ruler_poly"))
+                                 ruler_poly=scale.get("ruler_poly"),
+                                 grid_angles=[d["angle"] for d in scale.get("detail", []) if "angle" in d]
+                                 if bg == "grid" else None)
         comps, lab = strip_components(m)
         return m, f, comps, lab
 
@@ -556,22 +750,41 @@ def process(path, background="auto", grid_in=0.5, ruler_tick_mm=None, px_per_mm=
         if c["is_strip"]:
             c.update(stations=st, cl=cl, Lpx=Lpx)
             strips.append(c)
+    if len(strips) > 1:
+        # a strip stands out from the background around it; much fainter "strips" are stains or films
+        im_lab = cv2.cvtColor(cv2.resize(img, None, fx=f, fy=f, interpolation=cv2.INTER_AREA),
+                              cv2.COLOR_BGR2LAB).astype(np.float32)
+        near = cv2.dilate(m, _disk(RING_MM[0] * WORK_PX_MM)) > 0
+        for c in strips:
+            comp = (lab == c["label"]).astype(np.uint8)
+            ring = (cv2.dilate(comp, _disk(RING_MM[1] * WORK_PX_MM)) > 0) & ~near
+            er = cv2.erode(comp, _disk(3)) > 0
+            core = np.median(im_lab[er if er.any() else comp > 0], 0)
+            c["contrast"] = float(np.linalg.norm(core - np.median(im_lab[ring], 0))) if ring.any() else np.inf
+        best = max(c["contrast"] for c in strips)
+        for c in strips:
+            if c["contrast"] < STRIP_CONTRAST_FRAC * best:
+                print(f"{os.path.basename(path)}: dropped a strip-shaped region at ({c['centroid'][0] / WORK_PX_MM:.1f}, "
+                      f"{c['centroid'][1] / WORK_PX_MM:.1f}) mm: contrast {c['contrast']:.0f} against {best:.0f} for the "
+                      "strongest strip (stained mat or a film)")
+        strips = [c for c in strips if c["contrast"] >= STRIP_CONTRAST_FRAC * best]
     strips.sort(key=lambda c: -c["area_mm2"])
     h, w = m.shape
-    rule = {"centre": "center"}.get(pick, pick) or "center"   # older strip_selection.json files say "centre"
-    picker = {"center": lambda c: np.hypot(*(c["centroid"] - [w / 2, h / 2])),
+    rule = {"centre": "center"}.get(pick, pick) or "all"      # older strip_selection.json files say "centre"
+    picker = {"all": None, "center": lambda c: np.hypot(*(c["centroid"] - [w / 2, h / 2])),
               "upper": lambda c: c["centroid"][1], "lower": lambda c: -c["centroid"][1],
               "left": lambda c: c["centroid"][0], "right": lambda c: -c["centroid"][0]}
     if rule not in picker:
         raise RuntimeError(f"unknown strip selection {rule!r} (use {', '.join(picker)})")
-    chosen = min(strips, key=picker[rule])["label"] if strips else -1
+    chosen = ({c["label"] for c in strips} if rule == "all"
+              else {min(strips, key=picker[rule])["label"]} if strips else set())
 
     stem = os.path.splitext(os.path.basename(path))[0]
     results = []
     for k, c in enumerate(strips):
         t = c["stations"].loc[c["stations"].ok, "thickness_mm"]
         q1, q3 = np.percentile(t, [25, 75])
-        res = dict(image=os.path.basename(path), strip=k + 1, selected=c["label"] == chosen,
+        res = dict(image=os.path.basename(path), strip=k + 1, selected=c["label"] in chosen,
                    selected_by=rule,
                    background=bg, scale_method=scale["method"], px_per_mm=scale["px_per_mm"],
                    scale_unit=scale["unit"], px_per_unit=scale["px_per_unit"],
@@ -640,13 +853,90 @@ def overlay(img, f, m, comps, strips, scale, out):
 
 
 def load_selection(folder):
-    """{photo name: rule} from <folder>/strip_selection.json, e.g. {"DSC00503.jpg": "lower"};
-    photos not listed use the strip nearest the frame center."""
+    """{photo name: rule} from <folder>/strip_selection.json, e.g. {"DSC00503.jpg": "lower"}; rules: all, center,
+    upper, lower, left, right, or exclude (the photo is left out). Photos not listed use all their strips."""
     f = os.path.join(folder, "strip_selection.json")
     if not os.path.exists(f):
         return {}
     with open(f) as fh:
         return {k: v for k, v in json.load(fh).items() if not k.startswith("_")}
+
+
+AUTO_SOURCE = "measure_thickness.py"    # start of the source text of an automatic thickness_mm
+
+
+def output_location(folder):
+    """Output folder for a photo folder: <SAMPLE>/Thickness, <ID>/thickness_auto/test<N>/ for
+    <SAMPLE>/Thickness, <ID>/test <N> (or test<N>), else <folder>/thickness_auto/."""
+    d = os.path.abspath(folder)
+    m = re.fullmatch(r"(?i)test\s*(\d+)", os.path.basename(d))
+    if m and os.path.basename(os.path.dirname(d)).lower().startswith("thickness"):
+        return os.path.join(os.path.dirname(d), "thickness_auto", f"test{int(m[1])}")
+    return os.path.join(d, "thickness_auto")
+
+
+def test_of_photo_folder(folder):
+    """The test folder for a photo folder <SAMPLE>/Thickness, <ID>/test <N> (or test<N>), else None."""
+    d = os.path.abspath(folder)
+    m = re.fullmatch(r"(?i)test\s*(\d+)", os.path.basename(d))
+    if not m or not os.path.basename(os.path.dirname(d)).lower().startswith("thickness"):
+        return None
+    hits = sorted(glob.glob(os.path.join(os.path.dirname(os.path.dirname(d)), f"test{int(m[1])}_*")))
+    return hits[0] if len(hits) == 1 and os.path.isdir(hits[0]) else None
+
+
+def pooled_thickness(rows, notes):
+    """thickness_mm from result rows of one photo folder: mean and SD of all valid stations of the selected strips
+    of the photos whose scale is reliable (scale_ok). notes ({photo: why it was left out}) is extended. Returns
+    (thickness_mm or None, photos used)."""
+    vals, photos = [], []
+    for r in rows:
+        if not r["selected"]:
+            continue
+        if not r["scale_ok"]:
+            notes[r["image"]] = "scale uncertain"
+            continue
+        st = pd.read_csv(r["stations_csv"])
+        vals.append(st.loc[st.ok, "thickness_mm"].to_numpy())
+        if r["image"] not in photos:
+            photos.append(r["image"])
+    v = np.concatenate(vals) if vals else np.array([])
+    if len(v) < 2:
+        return None, photos
+    return ({"H": round(float(v.mean()), 5), "H_sd": round(float(v.std(ddof=1)), 4),
+             "source": f"{AUTO_SOURCE}: mean and SD of {len(v)} stations of the selected strips in " + ", ".join(photos)},
+            photos)
+
+
+def write_thickness(folder, th, keep_workbook=False):
+    """Put th into the test_config.json of the photo folder's test. A workbook value it replaces is kept in
+    thickness_mm.workbook; with keep_workbook the workbook value stays (or is put back) instead."""
+    root = test_of_photo_folder(folder)
+    if root is None:
+        print(f"{folder}: not <SAMPLE>/Thickness, <ID>/test <N> with a matching test folder; nothing written")
+        return
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "strain_tracking"))
+    import testcfg
+    T = testcfg.Test(root)
+    name = f"{os.path.basename(os.path.dirname(root))}/{os.path.basename(root)}"
+    if not T.config:
+        print(f"{name}: no test_config.json yet (run make_config.py first); nothing written")
+        return
+    old = T.config.get("thickness_mm") or {}
+    auto = str(old.get("source", "")).startswith(AUTO_SOURCE)
+    book = old.get("workbook") if auto else ({k: old[k] for k in ("H", "H_sd", "source") if k in old} if old else None)
+    if keep_workbook and book:
+        T.config["thickness_mm"] = book
+        T.write_config(T.config)
+        print(f"{name}: workbook thickness_mm H = {book.get('H')} mm in use ({book.get('source', 'source not given')}); "
+              f"photos {th['H']} mm")
+        return
+    if book:
+        th = dict(th, workbook=book)
+    T.config["thickness_mm"] = th
+    T.write_config(T.config)
+    print(f"{name}: thickness_mm H = {th['H']} ± {th['H_sd']} mm written"
+          + (f" (workbook {book.get('H')} mm, {(th['H'] / book['H'] - 1) * 100:+.1f}%)" if book and book.get("H") else ""))
 
 
 def main():
@@ -658,7 +948,12 @@ def main():
     ap.add_argument("--ruler-tick-mm", type=float, help="tick spacing on the ruler edge to use "
                     "(skips the automatic mm/inch edge classification)")
     ap.add_argument("--px-per-mm", type=float, help="use this scale instead of detecting it")
-    ap.add_argument("--out", help="output folder (default: <image folder>/thickness_auto)")
+    ap.add_argument("--out", help="output folder (default: <SAMPLE>/Thickness, <ID>/thickness_auto/test<N>)")
+    ap.add_argument("--write", action="store_true",
+                    help="put the result into each test's test_config.json as thickness_mm, in place of a workbook "
+                         "value (kept in thickness_mm.workbook)")
+    ap.add_argument("--keep-workbook", action="store_true",
+                    help="with --write: keep (or put back) a workbook value; fill only tests without one")
     a = ap.parse_args()
 
     files = []
@@ -670,26 +965,51 @@ def main():
                       and "thickness_auto" not in f]
         else:
             files.append(p)
-    rows = {}
+    rows, notes = {}, {}          # notes: {photo folder: {photo: why it gave no thickness}}
     for fpath in sorted(files):
-        outdir = a.out or os.path.join(os.path.dirname(fpath), "thickness_auto")
+        outdir = a.out or output_location(os.path.dirname(fpath))
+        folder, photo = os.path.dirname(fpath), os.path.basename(fpath)
+        notes.setdefault(folder, {})
+        pick = load_selection(folder).get(photo)
+        for old in glob.glob(os.path.join(glob.escape(outdir), os.path.splitext(photo)[0] + "_*")):
+            os.remove(old)            # an earlier run's overlay and stations of this photo
+        if pick == "exclude":
+            print(f"{photo:16s} excluded in strip_selection.json")
+            notes[folder][photo] = "excluded in strip_selection.json"
+            continue
         try:
-            pick = load_selection(os.path.dirname(fpath)).get(os.path.basename(fpath))
             res, sc = process(fpath, a.background, a.grid_in, a.ruler_tick_mm, a.px_per_mm, outdir, pick)
         except Exception as e:  # keep going through a folder
-            print(f"{fpath}: FAILED ({e})", file=sys.stderr)
+            print(f"{fpath}: FAILED ({e})")
+            notes[folder][photo] = f"failed: {e}"
             continue
         for r in res:
             r["folder"] = os.path.dirname(fpath)
+            r["stations_csv"] = os.path.join(outdir, f"{os.path.splitext(r['image'])[0]}_strip{r['strip']}_stations.csv")
             print(f"{os.path.basename(fpath):16s} strip {r['strip']}{'*' if r['selected'] else ' '} "
                   f"{sc['method']:6s} {sc['px_per_mm']:6.1f} px/mm{'' if sc['scale_ok'] else ' (?)'}  "
                   f"{r['mean_mm']:.3f} ± {r['sd_mm']:.3f} mm "
                   f"(median {r['median_mm']:.3f}, n={r['n_stations']}, L={r['length_mm']:.1f} mm)")
         if not res:
             print(f"{os.path.basename(fpath):16s} no complete strip found")
+            notes[folder][photo] = "no complete strip found"
         rows.setdefault(outdir, []).extend(res)
     for outdir, rr in rows.items():
-        pd.DataFrame(rr).to_csv(os.path.join(outdir, "summary.csv"), index=False)
+        pd.DataFrame(rr).drop(columns="stations_csv").to_csv(os.path.join(outdir, "summary.csv"), index=False)
+    if a.write:
+        by_folder = {}
+        for rr in rows.values():
+            for r in rr:
+                by_folder.setdefault(r["folder"], []).append(r)
+        for folder in sorted(notes):
+            th, used = pooled_thickness(by_folder.get(folder, []), notes[folder])
+            left = "; ".join(f"{p} ({why})" for p, why in sorted(notes[folder].items())) or "none"
+            print(f"{folder}: thickness from {len(used)} photo(s): {', '.join(used) or 'none'}; left out: {left}")
+            if th is None:
+                print(f"{folder}: NO THICKNESS: no photo with a measured strip at a reliable scale; "
+                      "the config keeps what it has")
+            else:
+                write_thickness(folder, th, a.keep_workbook)
 
 
 if __name__ == "__main__":

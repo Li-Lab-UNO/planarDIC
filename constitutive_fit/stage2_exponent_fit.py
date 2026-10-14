@@ -11,7 +11,7 @@ Solved with scipy least_squares (trust region, eps bounded to the level grid), s
 
     ../.venv/bin/python stage2_exponent_fit.py --test N1739/test1 [--exps fiber|all] [--synthetic fib40]
 --synthetic NAME fits the FE data from stage2_synthetic_c.py (fe_exp_NAME.npz) instead, as a recovery check.
-Outputs: Images/constitutive_fit/local/stage2_exponent/ (stage2_exponent_<tag>.json/.npz/.png)
+Outputs: <test>/constitutive_fit/local/stage2_exponent/ (stage2_exponent_<tag>.json/.npz/.png)
 """
 import argparse
 import json

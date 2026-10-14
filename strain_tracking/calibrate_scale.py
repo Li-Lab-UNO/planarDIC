@@ -21,7 +21,7 @@ the output. calibration_exclude in test_config.json (e.g. ["Y3", "Y5"]) or --exc
 rule; --no-auto turns it off.
 Approximate rest-state tine tips come from the test's test_config.json
 (calibration_tines_px). Writes <test folder>/scale_calibration.json (used by later
-scripts) and a diagnostic plot in the first deformation's strain_results/.
+scripts) and a diagnostic plot, <test folder>/DIC_results/scale_calibration.png.
 """
 import argparse
 import glob
@@ -243,8 +243,7 @@ def main():
     ax[2].axhline(px_per_mm, color="k", lw=.8)
     ax[2].set_xlabel("tine pair (1 = top/left … 5 = bottom/right)"); ax[2].set_ylabel("px per mm")
     ax[2].set_title(f"Scale per tine pair; line = result {px_per_mm:.2f} px/mm"); ax[2].legend(); ax[2].grid(alpha=.3)
-    first = [d for d in sorted(os.listdir(IMAGES)) if d.startswith(T.deformation.iloc[0][:6])][0]
-    out = os.path.join(IMAGES, first, "strain_results", "scale_calibration.png")
+    out = os.path.join(TC.results, "scale_calibration.png")
     os.makedirs(os.path.dirname(out), exist_ok=True)
     fig.savefig(out, dpi=95)
     print("wrote", out)

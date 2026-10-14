@@ -15,7 +15,7 @@ compared with the baseline value and its protocol-bootstrap 95% interval.
 
     ../.venv/bin/python check_preprocessing.py --test N1739/test1 [--inputs dic_affine cs4] [--tracks tine_region|standard]
 Outputs: preprocessing_sensitivity.csv / .png in the chosen baseline's folder
-(constitutive_fit/baseline_tine_region/ by default, the primary full-domain baseline)
+(constitutive_fit/baseline/ by default, the primary full-domain baseline)
 """
 import argparse
 import glob

@@ -17,7 +17,7 @@ then each group's map is scored on the other groups' equations. If one alpha per
 would agree and cross-prediction would cost little.
 
     ../.venv/bin/python stage2_residuals.py --test N1739/test1
-Outputs: Images/constitutive_fit/local/stage2_fit/stage2_residuals.png / .json
+Outputs: <test>/constitutive_fit/local/stage2_fit/stage2_residuals.png / .json
 """
 import json
 import os

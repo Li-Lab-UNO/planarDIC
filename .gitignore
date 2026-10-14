@@ -8,9 +8,9 @@
 !/CLAUDE.md
 !/requirements.txt
 !/analysis_settings.json
-!/run_pipeline.sh
-!/pipeline.mac.ini
-!/pipeline.ubuntu.ini
+!/runDIC.sh
+!/runDIC.mac.ini
+!/runDIC.ubuntu.ini
 
 # code folders: Python and Markdown files only
 !/strain_tracking/

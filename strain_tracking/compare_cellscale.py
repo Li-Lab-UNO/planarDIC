@@ -15,7 +15,7 @@ CSV columns: <method>_E_zz, <method>_E_thetatheta, <method>_E_ztheta for methods
 cs4, dic4, dicquad, dicroi, rake; ptdiff_<point>_px; force_z_mN, force_theta_mN.
 
 Example:
-    ../.venv/bin/python compare_cellscale.py ../N1739_LFPA/test1_08252026_PLC25_38-20/Images/Def11_Equibiaxial/strain_results/Def11_Equibiaxial_tine_region.npz
+    ../.venv/bin/python compare_cellscale.py ../N1739_LFPA/test1_08252026_PLC25_38-20/DIC_results/Def11_Equibiaxial.npz
 
 Outputs are written next to the .npz file.
 """

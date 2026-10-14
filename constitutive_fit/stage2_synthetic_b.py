@@ -15,7 +15,7 @@ Ring patches have beta = phi = 1. For each case the single-factor fit (ladder (a
 residuals.
 
     ../.venv/bin/python stage2_synthetic_b.py --test N1739/test1 [--noise 0 0.03]
-Outputs: Images/constitutive_fit/local/stage2_synthetic/ (fe_fiber_only.npz, fe_split.npz, stage2_synthetic_b.*)
+Outputs: <test>/constitutive_fit/local/stage2_synthetic/ (fe_fiber_only.npz, fe_split.npz, stage2_synthetic_b.*)
 """
 import argparse
 import json

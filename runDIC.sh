@@ -2,25 +2,26 @@
 # Run the strain-tracking pipeline for one or more tests, from sorted (or unsorted) CellScale images to
 # tracks, figures and exports. Run from anywhere; paths are relative to this script's folder.
 #
-#   ./run_pipeline.sh N1739                       all N1739 tests, every step
-#   ./run_pipeline.sh N1739/test1 N1739/test2     two tests
-#   ./run_pipeline.sh --steps track,jfig N1757    only some steps
-#   ./run_pipeline.sh --dry-run N1739             print the commands, run nothing
-#   ./run_pipeline.sh --setup                     only build .venv from requirements.txt
+#   ./runDIC.sh N1739                       all N1739 tests, every step
+#   ./runDIC.sh N1739/test1 N1739/test2     two tests
+#   ./runDIC.sh --steps track,jfig N1757    only some steps
+#   ./runDIC.sh --dry-run N1739             print the commands, run nothing
+#   ./runDIC.sh --setup                     only build .venv from requirements.txt
 #
-# Run ./run_pipeline.sh --help for all options.
+# Run ./runDIC.sh --help for all options.
 
 set -uo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$HERE"
 
-ALL_STEPS="sort config scale widths track artifacts jfig exports edge compare"
+ALL_STEPS="sort config scale widths thickness track artifacts jfig exports edge compare"
 STEPS="$ALL_STEPS"
 DEFS="Def11 Def12 Def13 Def14 Def15 Def16 Def17 Def18 Def19"
 EXPORT_DEFS="Def11"
 PY="$HERE/.venv/bin/python"
 LABEL=""
+THICKNESS=auto
 DRY=0
 YES=0
 SETUP=0
@@ -31,9 +32,9 @@ LOADING_ONLY=""
 
 usage() {
   cat <<EOF
-Usage: ./run_pipeline.sh [options] [TEST...]
+Usage: ./runDIC.sh [options] [TEST...]
 
-Defaults come from this computer's settings file, pipeline.mac.ini on macOS and pipeline.ubuntu.ini on
+Defaults come from this computer's settings file, runDIC.mac.ini on macOS and runDIC.ubuntu.ini on
 Linux (both tracked by git); options given here override it for one run. Without TEST, the tests listed
 in the settings file are run.
 
@@ -47,6 +48,9 @@ Steps (in this order; --steps picks a subset, comma separated):
   scale    calibrate_scale.py   image scale from Def01 and Def19 (tine pairs in calibration_exclude
                                 of test_config.json are left out)
   widths   measure_tines.py     tine spans -> widths_mm in test_config.json
+  thickness measure_thickness.py thickness from the photos in <SAMPLE>/Thickness*/test N -> thickness_mm,
+                                in place of the workbook value (thickness = auto), or only for tests
+                                without one (thickness = workbook / --thickness workbook)
   track    track_protocols.py   Def11-Def19 against the common reference, one job per deformation
   artifacts artifact_check.py   find local tracking errors (sliding particles, glare) at the Def11 peak; when
                                 one is confirmed, exclude it in test_config.json and track the test again
@@ -66,21 +70,24 @@ Options:
                            (default: 1; 0 turns it off)
   -e, --export-defs LIST   deformations to export (default: Def11)
   -l, --label TEXT         label for a new config, e.g. "labeled healthy"
+      --thickness SOURCE   auto (default): thickness measured from the photos for every test (a test whose
+                           photos give none keeps the workbook value); workbook: the sample's workbook,
+                           measured from the photos only where there is none
   -p, --python PATH        Python to use (default: .venv/bin/python)
       --setup              build .venv from requirements.txt first (needs python3 and python3-venv)
   -n, --dry-run            print the commands only
   -y, --yes                don't ask for confirmation
       --ask                ask for confirmation (overrides yes = yes)
-      --config FILE        read the settings from FILE instead of pipeline.mac.ini / pipeline.ubuntu.ini
+      --config FILE        read the settings from FILE instead of runDIC.mac.ini / runDIC.ubuntu.ini
   -h, --help               this help
 
 A failed sort, config, scale, widths or tracking step skips that test's later steps; a failed figure or
-export doesn't. Logs: <test folder>/pipeline_logs/run_<date>_<time>/, one file per step plus pipeline.log
-(everything printed here); edge and compare log to comparisons/pipeline_logs/run_<date>_<time>/.
+export doesn't. Logs: <test folder>/DIC_logs/run_<date>_<time>/, one file per step plus runDIC.log
+(everything printed here); edge and compare log to comparisons/DIC_logs/run_<date>_<time>/.
 EOF
 }
 
-# ---- settings file: built-in defaults < pipeline.mac.ini / pipeline.ubuntu.ini < command line ----------------------------------------
+# ---- settings file: built-in defaults < runDIC.mac.ini / runDIC.ubuntu.ini < command line ----------------------------------------
 # expand_defs LIST: "Def11-Def19" -> "Def11 Def12 ... Def19"; commas -> spaces
 expand_defs() {
   local out="" d
@@ -125,14 +132,16 @@ read_config() {
                     if [ "$v" = 1 ]; then LOADING_ONLY="--loading-only"; else LOADING_ONLY=""; fi ;;
       yes) YES="$(yesno "$f" "$n" "$key" "$val")" || exit 2 ;;
       label) LABEL="$val" ;;
+      thickness) case "$val" in workbook|auto) THICKNESS="$val" ;;
+                   *) echo "$f line $n: thickness must be workbook or auto"; exit 2 ;; esac ;;
       python) case "$val" in /*) PY="$val" ;; *) PY="$HERE/$val" ;; esac ;;
-      *) echo "$f line $n: unknown setting '$key' (see pipeline.mac.ini or pipeline.ubuntu.ini)"; exit 2 ;;
+      *) echo "$f line $n: unknown setting '$key' (see runDIC.mac.ini or runDIC.ubuntu.ini)"; exit 2 ;;
     esac
   done < "$f"
 }
 case "$(uname -s)" in                         # this computer's settings file
-  Darwin) CONF="$HERE/pipeline.mac.ini" ;;
-  Linux) CONF="$HERE/pipeline.ubuntu.ini" ;;
+  Darwin) CONF="$HERE/runDIC.mac.ini" ;;
+  Linux) CONF="$HERE/runDIC.ubuntu.ini" ;;
   *) CONF="" ;;
 esac
 for ((i = 1; i <= $#; i++)); do              # --config FILE is read before the other options
@@ -153,6 +162,7 @@ while [ $# -gt 0 ]; do
     --full-cycle) LOADING_ONLY=""; shift ;;
     -e|--export-defs) EXPORT_DEFS="$(expand_defs "$2")"; shift 2 ;;
     -l|--label) LABEL="$2"; shift 2 ;;
+    --thickness) case "$2" in workbook|auto) THICKNESS="$2" ;; *) echo "--thickness must be workbook or auto"; exit 2 ;; esac; shift 2 ;;
     -p|--python) PY="$2"; shift 2 ;;
     --setup) SETUP=1; shift ;;
     -n|--dry-run) DRY=1; shift ;;
@@ -184,7 +194,7 @@ fi
 
 [ ${#TESTS[@]} -eq 0 ] && { echo "no tests: give them on the command line or set 'tests' in ${CONF#$HERE/} (--help for all options)"; exit 2; }
 if [ "$DRY" = 0 ]; then
-  [ -x "$PY" ] || { echo "$PY not found: run ./run_pipeline.sh --setup first"; exit 1; }
+  [ -x "$PY" ] || { echo "$PY not found: run ./runDIC.sh --setup first"; exit 1; }
   "$PY" - <<'EOF' || exit 1
 import sys
 missing = []
@@ -194,7 +204,7 @@ for m in ("numpy", "scipy", "pandas", "matplotlib", "cv2", "imageio", "imageio_f
     except ImportError:
         missing.append(m)
 if missing:
-    sys.exit(f"missing Python packages: {', '.join(missing)}; run ./run_pipeline.sh --setup")
+    sys.exit(f"missing Python packages: {', '.join(missing)}; run ./runDIC.sh --setup")
 if not (3, 9) <= sys.version_info[:2] <= (3, 12):
     print(f"note: tested with Python 3.9-3.12, this is {sys.version.split()[0]}")
 EOF
@@ -226,28 +236,29 @@ key() { echo "${1//\//_}"; }
 STAMP=$(date +%Y%m%d_%H%M%S)
 # tlogdir TEST: this run's log folder for TEST, or for the cross-test steps when TEST is empty
 tlogdir() {
-  if [ -z "$1" ]; then echo "$HERE/comparisons/pipeline_logs/run_$STAMP"; return; fi
+  if [ -z "$1" ]; then echo "$HERE/comparisons/DIC_logs/run_$STAMP"; return; fi
   local d; d=$(ls -d "$HERE"/"${1%%/*}"*/"${1##*/}"_*/ 2>/dev/null | head -1)
-  echo "${d%/}/pipeline_logs/run_$STAMP"
+  echo "${d%/}/DIC_logs/run_$STAMP"
 }
 ndefs=$(echo $DEFS | wc -w | tr -d ' ')
 echo "Tests:   ${TESTS[*]}"
 echo "Config:  ${CONF#$HERE/}"
 echo "Steps:   $STEPS"
+has thickness && echo "Thickness: $([ "$THICKNESS" = auto ] && echo "measured from the photos (in place of workbook values)" || echo "workbook; measured from the photos where there is none")"
 has track && echo "Track:   $DEFS ($(( ${#TESTS[@]} * ndefs )) deformations, $JOBS at a time, $(( NCPU / JOBS > 1 ? NCPU / JOBS : 1 )) threads each${LOADING_ONLY:+, loading branch only})"
 has exports && echo "Exports: $EXPORT_DEFS"
 echo "Python:  $PY"
 [ "$DRY" = 1 ] && echo "(dry run: commands are printed, not run)"
 if [ "$DRY" = 0 ]; then
-  echo "Logs:    <test folder>/pipeline_logs/run_$STAMP/"
+  echo "Logs:    <test folder>/DIC_logs/run_$STAMP/"
   if [ "$YES" = 0 ] && [ -t 0 ]; then
     read -r -p "Proceed? [y/N] " ans
     case "$ans" in y|Y|yes) ;; *) echo "stopped"; exit 0 ;; esac
   fi
   STATE=$(mktemp -d)                    # failures list for the summary; removed at the end
   CONSOLE=()
-  for t in "${TESTS[@]}"; do mkdir -p "$(tlogdir "$t")"; CONSOLE+=("$(tlogdir "$t")/pipeline.log"); done
-  exec > >(tee "${CONSOLE[@]}") 2>&1   # everything printed from here on also goes to each test's pipeline.log
+  for t in "${TESTS[@]}"; do mkdir -p "$(tlogdir "$t")"; CONSOLE+=("$(tlogdir "$t")/runDIC.log"); done
+  exec > >(tee "${CONSOLE[@]}") 2>&1   # everything printed from here on also goes to each test's runDIC.log
   T_RUN=$SECONDS                         # runtime is counted from here (after the confirmation question)
 fi
 # each tracking job writes a progress line to its log this often, so the status line can be as current
@@ -308,12 +319,21 @@ track_status() {
     echo "  [$(date +%H:%M:%S), $(( (SECONDS - t0) / 60 )) min] $done/$total done${running:+; running: $running}"
   done
 }
+# track_of TEST DEF: path of the deformation's full-domain track, <test>/DIC_results/<deformation folder>.npz
+track_of() {
+  local s=${1%%/*} n=${1##*/} f
+  for f in "$HERE"/"$s"*/"$n"_*/Images/"$2"_*/; do
+    f=${f%/}; f="${f%/Images/*}/DIC_results/${f##*/}.npz"
+    [ -e "$f" ] && { echo "$f"; return 0; }
+  done
+  return 1
+}
 # all_tracked TEST: true when Def11-Def19 all have a full-domain track (needed by jfig, edge and compare)
 all_tracked() {
   [ "$DRY" = 1 ] && return 0
-  local s=${1%%/*} n=${1##*/} d
+  local d
   for d in Def11 Def12 Def13 Def14 Def15 Def16 Def17 Def18 Def19; do
-    ls "$HERE"/"$s"*/"$n"_*/Images/"$d"_*/strain_results/"$d"_*_tine_region.npz >/dev/null 2>&1 || return 1
+    track_of "$1" "$d" >/dev/null || return 1
   done
 }
 
@@ -344,6 +364,19 @@ fi
 if has widths; then
   step "tine spans"
   for t in "${TESTS[@]}"; do run widths "$t" "$PY" "$ST/measure_tines.py" --test "$t" --write; done
+fi
+
+if has thickness; then
+  step "thickness from the photos ($([ "$THICKNESS" = auto ] && echo "in place of workbook values" || echo "where there is no workbook value"))"
+  for t in "${TESTS[@]}"; do
+    n=${t##*/test}; photos=""
+    for d in "$HERE"/"${t%%/*}"*/Thickness*/*/; do      # <SAMPLE>/Thickness, <ID>/test <N> or test<N>
+      b=$(basename "$d"); [[ "$b" =~ ^[Tt]est[[:space:]]*0*$n$ ]] && photos="${d%/}"
+    done
+    if [ -z "$photos" ]; then echo "  skip  thickness $(key "$t"): no thickness photo folder"; continue; fi
+    SOFT=1 run thickness "$t" "$PY" "$HERE/thickness/measure_thickness.py" "$photos" --write \
+      $([ "$THICKNESS" = workbook ] && echo --keep-workbook)
+  done
 fi
 
 if has track; then
@@ -378,8 +411,7 @@ if has artifacts; then
     tk=$(key "$t")
     if [ "$DRY" = 1 ]; then echo "  $PY $ST/artifact_check.py --test $t   (exit 3: exclusions added, track again)"; continue; fi
     [ -e "$(tlogdir "$t")/FAILED" ] && { echo "  skip artifacts ($tk failed earlier)"; continue; }
-    ls "$HERE"/"${t%%/*}"*/"${t##*/}"_*/Images/Def11_*/strain_results/Def11_*_tine_region.npz >/dev/null 2>&1 \
-      || { echo "  skip  artifacts $tk: no Def11 track"; continue; }
+    track_of "$t" Def11 >/dev/null || { echo "  skip  artifacts $tk: no Def11 track"; continue; }
     log="$(tlogdir "$t")/artifacts.log"
     "$PY" "$ST/artifact_check.py" --test "$t" > "$log" 2>&1; rc=$?
     case $rc in
@@ -411,8 +443,8 @@ fi
 if has exports; then
   step "exports ($EXPORT_DEFS)"
   export_one() {   # TEST DEF: CellScale comparison first, so the animations include the force traces
-    local t="$1" d="$2" s=${1%%/*} n=${1##*/} npz
-    npz=$(ls "$HERE"/"$s"*/"$n"_*/Images/"$d"_*/strain_results/"$d"_*_tine_region.npz 2>/dev/null | head -1)
+    local t="$1" d="$2" npz
+    npz=$(track_of "$t" "$d")
     if [ -z "$npz" ] && [ "$DRY" = 0 ]; then echo "  FAIL  exports ${t//\//_} $d: no track"; return 1; fi
     npz=${npz:-<track of $t $d>}
     SOFT=1 run "cellscale_$d" "$t" "$PY" "$HERE/strain_tracking/compare_cellscale.py" "$npz" &&
@@ -460,7 +492,7 @@ if has track || has artifacts; then
     done
   done
 fi
-echo "logs: <test folder>/pipeline_logs/run_$STAMP/"
+echo "logs: <test folder>/DIC_logs/run_$STAMP/"
 if [ -s "$STATE/failures.txt" ]; then
   echo "FAILED steps:"; sed 's/^/  /' "$STATE/failures.txt"; rm -rf "$STATE"
   echo "total runtime: $(hms $(( SECONDS - T_RUN )))  (finished $(date '+%Y-%m-%d %H:%M:%S'))"; exit 1

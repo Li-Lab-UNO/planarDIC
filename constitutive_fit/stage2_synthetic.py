@@ -28,7 +28,7 @@ Patterns: 'uniform' (alpha = 1 everywhere: the null test; its recovered RMS erro
 patch contrasts) and 'stage1' (interior alpha from Stage 1, outer ring alpha = 1).
 
     ../.venv/bin/python stage2_synthetic.py --test N1739/test1 [--every 8] [--modes 8] [--win 1] [--noise 0 0.03 0.1]
-Outputs: Images/constitutive_fit/local/stage2_synthetic/ (FE solutions are cached as fe_<pattern>.npz)
+Outputs: <test>/constitutive_fit/local/stage2_synthetic/ (FE solutions are cached as fe_<pattern>.npz)
 """
 import argparse
 import json
@@ -54,8 +54,7 @@ import constitutive as M  # noqa: E402
 from membrane_fe import Mesh  # noqa: E402
 from stage2_setup import assemble, geometry, measured_positions, window_F  # noqa: E402
 
-IMAGES = testcfg.get().images
-LOCAL = os.path.join(IMAGES, "constitutive_fit", "local")
+LOCAL = testcfg.get().local_dir
 
 
 def neighbor_pairs(mask):

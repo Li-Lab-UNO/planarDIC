@@ -21,7 +21,7 @@ Axes: theta increases upward in the image (dic2d.THETA_SIGN). Stored grids are [
 specimen frame (dic2d.to_specimen).
 
     ../.venv/bin/python build_local_data.py --test N1739/test1
-Outputs: Images/constitutive_fit/local/
+Outputs: <test>/constitutive_fit/local/
     local_data.npz          F per frame on the grid, masks, tared forces, zones, checksums
     patches.json            patch edges (mm from the left / bottom tips), coverage, strain concentrations
     stage0_peak_maps.png    lambda_z, lambda_theta, shear angle, J_2 at each protocol's peak
@@ -51,7 +51,7 @@ import dic2d as D  # noqa: E402
 from track_tine_region import SUFFIX, TINE_TIPS  # noqa: E402
 
 IMAGES = testcfg.get().images
-OUT = os.path.join(IMAGES, "constitutive_fit", "local")
+OUT = testcfg.get().local_dir
 MAP_SETS = (2, 3, 4, 5, 7, 8, 9)            # peak equibiaxial (Def11) + each ratio protocol
 PATCHES = (10, 10)                          # default (z, theta) patch counts: 0.85 x 1.00 mm; --patches to change
 
@@ -104,9 +104,9 @@ def main():
     # ---------------------------------------------------------------- local F per baseline frame
     F_all, ok_all, vt_all, src = [], [], [], {}
     for fd in folders:
-        path = os.path.join(IMAGES, fd, "strain_results", fd + SUFFIX + ".npz")
+        path = os.path.join(testcfg.get().results, fd + SUFFIX + ".npz")
         R = np.load(path, allow_pickle=True)
-        src[os.path.relpath(path, IMAGES)] = _sha(path)
+        src[os.path.relpath(path, testcfg.get().root)] = _sha(path)
         X0, shape, times = R["X0"], tuple(R["shape"]), np.round(R["times"], 1)
         win = D.window_points(float(R["step"]))
         kmap = {t: k for k, t in enumerate(times)}

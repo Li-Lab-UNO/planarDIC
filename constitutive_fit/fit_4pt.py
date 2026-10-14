@@ -17,7 +17,7 @@ linearized parameter correlations.
 
     ../.venv/bin/python fit_4pt.py --test N1739/test1 --sets 2-10
 Thickness and widths default to the test's test_config.json.
-Outputs: <test>/Images/constitutive_fit/
+Outputs: <test>/constitutive_fit/
 """
 import argparse
 import glob
@@ -101,7 +101,7 @@ def main():
     ap.add_argument("--width", choices=tuple(WIDTHS), default="tine_span")
     ap.add_argument("--starts", type=int, default=400)
     ap.add_argument("--boot", type=int, default=2000)
-    ap.add_argument("--out", default=os.path.join(TEST_ROOT, "Images", "constitutive_fit"))
+    ap.add_argument("--out", default=testcfg.get().fit_dir)
     a = ap.parse_args()
     if a.H is None or a.width not in WIDTHS:
         sys.exit("set thickness_mm.H and widths_mm in the test's test_config.json (or pass --H)")

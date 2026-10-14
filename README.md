@@ -7,31 +7,32 @@ others, and the code finds it automatically.
 - `strain_tracking/`: DIC tracking, kinematics, figures and exports.
 - `constitutive_fit/`: bulk and local constitutive fits.
 - `thickness/`: wall thickness from the strip photos.
-- `run_pipeline.sh`: runs the tracking pipeline for one or more tests (see "Running the pipeline").
+- `runDIC.sh`: runs the tracking pipeline for one or more tests (see "Running the pipeline").
 
 ## Layout
 
 ```
 planarDIC/
-├── run_pipeline.sh         the pipeline in one command
-├── pipeline.mac.ini, pipeline.ubuntu.ini   run_pipeline.sh defaults for each computer
+├── runDIC.sh         the pipeline in one command
+├── runDIC.mac.ini, runDIC.ubuntu.ini   runDIC.sh defaults for each computer
 ├── analysis_settings.json  physical sizes shared by every test (subset, grid step, strain window, ...)
 ├── requirements.txt        Python packages (.venv)
 ├── NEW_TEST_UBUNTU.md      a new test, step by step, on Ubuntu
 ├── strain_tracking/  constitutive_fit/  thickness/
-├── comparisons/            cross-test and cross-sample figures and tables (pipeline_logs/: their run logs)
+├── comparisons/            cross-test and cross-sample figures and tables (DIC_logs/: their run logs)
 └── <SAMPLE>/               e.g. N1739_LFPA: one folder per sample
-    ├── Thickness, <ID>/    thickness photos (and the manual workbook, if any)
+    ├── Thickness, <ID>/    thickness photos in test <N>/, their results in thickness_auto/test<N>/
+    │                       (and the manual workbook, if any)
     └── test<N>_<date>_<protocol>/       e.g. test1_08252026_PLC25_38-20
         ├── test_config.json             this test's settings (below)
         ├── scale_calibration.json       image scale (calibrate_scale.py)
         ├── Coords1.csv, *Data.csv, *.tst, Logs/   CellScale output
-        ├── pipeline_logs/run_<date>_<time>/     run_pipeline.sh logs for this test
+        ├── DIC_logs/run_<date>_<time>/     runDIC.sh logs for this test
+        ├── DIC_results/              tracks (DefNN_*.npz), exports and figures, named by deformation;
+        │                                config_tine_tips, scale_calibration, artifact_check, peak_J_over_mean
+        ├── constitutive_fit/            fit outputs for this test (see constitutive_fit/README.md)
         └── Images/
             ├── Def01_… / … Def19_…/     images, one folder per load–unload cycle (sort_images.py)
-            │   └── strain_results/      tracks (.npz) and per-deformation outputs
-            ├── peak_J_over_mean_Def11-19.png / .csv
-            ├── constitutive_fit/        fit outputs for this test
             └── sort_manifest.csv        old → new path for every sorted image
 ```
 
@@ -83,7 +84,7 @@ figure and .csv states the interior it used.
 | `widths_mm.tine_span` | [w_θ, w_z] in mm, the load-bearing widths in the stress: w_θ divides F_z, w_z divides F_θ; means of the opposing rakes' spans | `measure_tines.py --write` |
 | `widths_mm.tine_span_by_rake` | each rake's span (mm); opposing rakes differ because the tines are bent and applied unevenly | `measure_tines.py --write` |
 | `widths_mm.specimen` | [w_θ, w_z] of the whole specimen (mm), for the specimen-width sensitivity check | by hand |
-| `thickness_mm` | `H`, `H_sd` (mm) and their `source` | `make_config.py`, from the sample's thickness workbook (mean and sample SD of the test's readings); by hand otherwise (e.g. from `thickness/measure_thickness.py`) |
+| `thickness_mm` | `H`, `H_sd` (mm) and their `source`; `workbook`, the workbook value the photo measurement replaced | `measure_thickness.py --write`, from the photos (the pipeline's `thickness` step); `make_config.py` first fills it from the sample's thickness workbook (mean and sample SD of the test's readings), which stays where the photos give none or with `thickness = workbook`; or by hand |
 | `reference_deformation` | protocol whose first frame is the common reference (`Def11`) | `make_config.py` |
 | `dic.mask_saturated` | `true` to leave saturated glint pixels out of DIC matching | `make_config.py`: on when the tissue in the rest frame has saturated glints, off when it has none or is overexposed (≥ 10% saturated) |
 | `dic.exclude_px` | rectangles [x0, y0, x1, y1] (reference-frame px) left out of DIC matching, e.g. a speckle particle that slides over the tissue or a glare patch whose edges move with load. The rectangles move with the tracked tissue; neighboring subsets track on the remaining pixels | `artifact_check.py`, for confirmed tracking artifacts; or by hand |
@@ -102,7 +103,7 @@ excluded tine pairs), tine spans, thickness, tracked deformations, J/mean figure
 .venv/bin/python strain_tracking/status.py N1739 --notes
 ```
 
-## Running the pipeline: `run_pipeline.sh`
+## Running the pipeline: `runDIC.sh`
 
 Runs every tracking step for the tests given, in order, with one log per step:
 
@@ -112,6 +113,7 @@ Runs every tracking step for the tests given, in order, with one log per step:
 | `config` | `make_config.py` | finds and refines the tine tips; with an existing config (`--update`) every other setting is kept |
 | `scale` | `calibrate_scale.py` | image scale from Def01 and Def19, leaving out `calibration_exclude` |
 | `widths` | `measure_tines.py --write` | tine spans → `widths_mm` |
+| `thickness` | `measure_thickness.py --write` | thickness from the photos in `<SAMPLE>/Thickness, <ID>/test <N>` → `thickness_mm`, in place of the workbook value (`thickness = auto`, the default), or only where there is no workbook value (`thickness = workbook`, `--thickness workbook`) |
 | `track` | `track_protocols.py` | Def11–Def19 against the common reference, one job per deformation, several at a time |
 | `artifacts` | `artifact_check.py` | finds local tracking errors (a sliding speckle particle, a shifting glare patch) at the Def11 peak, confirms each against independent patch matching, excludes it in `test_config.json` and tracks that test again |
 | `jfig` | `peak_j_figure.py` | peak J/mean figure per test |
@@ -120,29 +122,29 @@ Runs every tracking step for the tests given, in order, with one log per step:
 | `compare` | `compare_peak_j.py` | cross-test J/mean comparison of the samples run |
 
 ```bash
-./run_pipeline.sh N1739
+./runDIC.sh N1739
 ```
 ```bash
-./run_pipeline.sh --steps track,jfig --jobs 6 N1739/test1 N1739/test2
+./runDIC.sh --steps track,jfig --jobs 6 N1739/test1 N1739/test2
 ```
 ```bash
-./run_pipeline.sh --dry-run N1739
+./runDIC.sh --dry-run N1739
 ```
 
-Each computer's defaults live in its settings file: `pipeline.mac.ini` on macOS and
-`pipeline.ubuntu.ini` on Linux (tests, steps, jobs, deformations, status interval, loading-only,
-confirmation). `run_pipeline.sh` picks the file from the operating system; both are tracked by git, so
+Each computer's defaults live in its settings file: `runDIC.mac.ini` on macOS and
+`runDIC.ubuntu.ini` on Linux (tests, steps, jobs, deformations, status interval, loading-only,
+confirmation, thickness source). `runDIC.sh` picks the file from the operating system; both are tracked by git, so
 they can be edited on either computer and committed like code. Options on the command line override it
 for one run (`--full-cycle` and `--ask` undo `loading_only = yes` and `yes = yes`); without tests on the
 command line, its `tests` are run. `--config FILE` reads another settings file.
 
 A bare sample name (`N1739`) runs all its tests. The script prints the plan and asks before
-starting (`--yes` skips the question), writes each test's logs to `<test folder>/pipeline_logs/run_<date>_<time>/` (one file per step, plus
-`pipeline.log` with everything the script printed; the cross-test steps log to `comparisons/pipeline_logs/`), skips the later
+starting (`--yes` skips the question), writes each test's logs to `<test folder>/DIC_logs/run_<date>_<time>/` (one file per step, plus
+`runDIC.log` with everything the script printed; the cross-test steps log to `comparisons/DIC_logs/`), skips the later
 steps of a test whose step failed, and prints a summary. `--jobs` sets how many tracking or export
 jobs run at once (default: `jobs` in the settings file; `auto` = CPU count − 1); `--defs` and
 `--export-defs` choose the deformations;
-`--setup` builds `.venv` first. `./run_pipeline.sh --help` lists every option. The parallel jobs share
+`--setup` builds `.venv` first. `./runDIC.sh --help` lists every option. The parallel jobs share
 the CPUs: each job gets (CPU count ÷ jobs) threads (`DIC_THREADS`), matches chunks of its subsets in
 parallel on them and reads the next image while matching; OpenCV's and NumPy's own threading are limited
 to match. A script run on its own uses every CPU. The subsets are matched independently, so the results
@@ -166,7 +168,7 @@ track records `branch`, and `strain_tracking/status.py` marks loading-only track
 2. **Sort the images:** `sort_images.py --test SAMPLE/testN --dry-run`, then without `--dry-run`.
 3. **Draft `test_config.json`:** `make_config.py --test SAMPLE/testN --label "labeled healthy"` finds the
    20 tine tips in the Def11 rest frame, refines them with the calibration's tip finder and writes the
-   tip lines, ROIs and label. Check `Images/Def11_*/strain_results/config_tine_tips.png`. If its
+   tip lines, ROIs and label. Check `DIC_results/config_tine_tips.png`. If its
    self-check fails it writes nothing: enter the flagged rake's tines in a config by hand (within about
    20 px) and run it again with `--update`, which refines them.
 4. **Calibrate the scale:** `calibrate_scale.py --test SAMPLE/testN` (Def01 and Def19). Tine pairs that
@@ -177,10 +179,11 @@ track records `branch`, and `strain_tracking/status.py` marks loading-only track
    SAMPLE/testN`: if it adds an excluded region (exit status 3), track the test again.
 7. **Figures and exports:** `peak_j_figure.py --test SAMPLE/testN`, then `compare_cellscale.py`,
    `export_fields.py` and `animate_fields.py` on a track `.npz`.
-8. **Thickness** (for stress and fitting only): `make_config.py` reads the sample's workbook; without one,
-   measure it with `thickness/measure_thickness.py` and add it by hand.
+8. **Thickness** (for stress and fitting only): `measure_thickness.py --recursive --write "<SAMPLE>/Thickness, <ID>"`
+   measures the photos and writes each test's thickness, in place of the workbook value `make_config.py`
+   entered (`--keep-workbook`: workbook values stay, the photos fill only tests without one). Check its overlays.
 
-Steps 2–7 are what `run_pipeline.sh` runs. Constitutive fitting is separate: see
+Steps 2–8 are what `runDIC.sh` runs (the thickness as its `thickness` step). Constitutive fitting is separate: see
 `constitutive_fit/README.md`.
 
 ## Thickness from photos: `thickness/measure_thickness.py`
@@ -197,12 +200,35 @@ than about 0.5 mm are not counted as wall.
 .venv/bin/python thickness/measure_thickness.py "N1739_LFPA/Thickness, 1739/test 1"
 ```
 
-Writes `thickness_auto/` next to the images: an overlay per image (mask, centerline, chords),
+Writes `<SAMPLE>/Thickness, <ID>/thickness_auto/test<N>/` for the photos in `test <N>/`: an overlay per image (mask, centerline, chords),
 per-station CSVs and `summary.csv` (mean, SD, median, IQR per strip). When an image holds several
-strips, each is reported and `selected` marks the one used (nearest the frame center unless
-`strip_selection.json` says otherwise). `scale_ok = False` (printed as `(?)`) means the two grid
-directions disagree by more than 5%; check the overlay's scale bar, and rerun that image with
-`--px-per-mm` if it is wrong.
+strips, each is reported and `selected` marks the ones used: all of them, since the strips in a test's
+photos are pieces of its specimen, unless `strip_selection.json` says otherwise
+(`{"DSC_1234.JPG": "upper"}` uses one strip, picked by position: upper, lower, left, right or center;
+`"exclude"` leaves a bad photo out). Strip-shaped regions with less than `STRIP_CONTRAST_FRAC` of the
+strongest strip's contrast against the mat (stains, films) are dropped and listed. `scale_ok = False`
+(printed as `(?)`) means the two grid directions disagree by more than 5%; check the overlay's scale
+bar, and rerun that image with `--px-per-mm` if it is wrong.
+
+`--write` puts the result into each test's `test_config.json` as `thickness_mm`: H and H_sd are the mean
+and SD of all stations of the selected strips of the test's photos with a reliable scale (the folder
+`test <N>` or `test<N>` is matched to the test folder `test<N>_…`). One such photo is enough; the log
+lists the photos used and those left out with the reason (excluded, failed, no complete strip, scale
+uncertain), or says that the test got no thickness (the config then keeps what it has, such as the
+workbook value). A workbook value it replaces is kept in `thickness_mm.workbook`, and the log shows the
+difference. With `--keep-workbook`, workbook values stay in use (one kept in `thickness_mm.workbook` is
+put back) and the photos fill only tests without one. The pipeline's `thickness` step runs it for each
+test (`thickness = auto`, the default, or `workbook` in the settings file).
+
+On the steel ruler the tissue is told from the steel by brightness alone (wet films on the steel look
+warm), with the edge `RULER_EDGE_FRAC` of the way from the steel's brightness to the tissue's.
+On the blue mat, pixels both warmer and brighter than the mat are the confident tissue; each strip is
+then grown (`grow_on_mat`) into the rest of its tissue, judged against the mat around it: pale layers
+and blurred edges (the edge half-way through the blur), and a darker but warm shaded side. Growth
+stays out of the mat's printed grid lines (found as straight warm runs along the grid directions),
+joins pieces of one strip whose gap is tissue-colored all along (a faint middle in a blurred photo),
+and never joins far-apart parts of a strip (the ends of a C stay apart). Isolated small pieces such
+as printed numerals stay out. Blurred photos still give a less certain edge: check their overlays.
 
 `thickness/compare_manual.py` compares the center strips with the workbooks' manual readings
 (same two images per test) and writes `comparisons/thickness_auto_vs_manual*.csv` and `.png`.
@@ -213,7 +239,7 @@ Python 3.9–3.12. Build `.venv` in the project folder (each computer needs its 
 from another operating system doesn't work):
 
 ```bash
-./run_pipeline.sh --setup
+./runDIC.sh --setup
 ```
 
 which runs `python3 -m venv .venv` and `.venv/bin/python -m pip install -r requirements.txt`. On
@@ -237,8 +263,8 @@ line updates in place; when output goes to a file (`nohup`, `> log.txt`, `| tee`
 written every 30 s (`DIC_PROGRESS_EVERY` sets the interval). `DIC_PROGRESS=lines` forces full lines and
 `DIC_PROGRESS=0` turns the line off.
 
-`run_pipeline.sh` tracks each deformation as its own job with its own log, so the per-frame lines go to
+`runDIC.sh` tracks each deformation as its own job with its own log, so the per-frame lines go to
 the logs. While tracking runs it prints a status line every second (`--status N` for every N s; 0 turns
 it off) with the deformations finished and the percent done of each running one; each job's log is
 updated as often (at most every 10 s). It prints the total tracking time when tracking ends, and the total
-runtime of the run at the end of the summary, both on screen and in each test's `pipeline.log`.
+runtime of the run at the end of the summary, both on screen and in each test's `runDIC.log`.

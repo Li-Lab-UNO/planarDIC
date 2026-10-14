@@ -1,4 +1,4 @@
-# Python 3.9-3.12. Install into the project's .venv: ./run_pipeline.sh --setup
+# Python 3.9-3.12. Install into the project's .venv: ./runDIC.sh --setup
 # (or: python3 -m venv .venv && .venv/bin/python -m pip install -r requirements.txt)
 numpy==2.0.2
 scipy==1.13.1

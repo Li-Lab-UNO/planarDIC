@@ -37,8 +37,8 @@ import testcfg  # noqa: E402
 TC = testcfg.get()
 TEST_ROOT = TC.root
 DEF1 = os.path.join(TC.images, TC.folder("Def01"))
-OUT = os.path.join(DEF1, "strain_results")
-DEF1_TRACK, DEF1_NPZ = D.load_track(TC.images, os.path.basename(DEF1), "standard")   # sliced from a full-domain track if needed
+OUT = TC.results
+DEF1_TRACK, DEF1_NPZ = D.load_track(TC.results, os.path.basename(DEF1), "standard")   # sliced from a full-domain track if needed
 _t, _p = D.find_frames([DEF1])
 _Dd = pd.read_csv(TC.first("*Data.csv"), encoding="latin1").drop_duplicates("Time_S").set_index("Time_S")
 _k_peak = int(np.nanargmax(_Dd.X_Size_um.reindex(np.round(_t, 1)).to_numpy(float)))   # rake peak
@@ -240,5 +240,5 @@ a.axhline(Et[0, 0], color="k", lw=.6, ls=":")
 a.set_xlabel("X (ref px)"); a.set_ylabel("column-mean E_zz"); a.legend(); a.grid(alpha=.3)
 a.set_title("E_zz averaged over Y")
 os.makedirs(OUT, exist_ok=True)
-fig.savefig(os.path.join(OUT, "bands_validation.png"), dpi=95)
-print("wrote", os.path.join(OUT, "bands_validation.png"))
+fig.savefig(os.path.join(OUT, "Def01_bands_validation.png"), dpi=95)
+print("wrote", os.path.join(OUT, "Def01_bands_validation.png"))

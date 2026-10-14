@@ -7,16 +7,17 @@ status and its findings.
 
 Every script needs a test (`--test SAMPLE/testN`, e.g. `--test N1739/test1`, or `DIC_TEST`; see the top-level `README.md`).
 The thickness and widths default to that test's `test_config.json`. The scripts import
-`dic2d` and `testcfg` from `../strain_tracking/`, and they read that folder's tracking output
-from `<test>/Images/DefNN_*/strain_results/`.
+`dic2d` and `testcfg` from `../strain_tracking/`, and they read the tracks in `<test>/DIC_results/`.
 
-## Outputs, per test (`<test>/Images/constitutive_fit/`)
+## Outputs, per test (`<test>/constitutive_fit/`)
 
 ```
 constitutive_fit/
-├── baseline_tine_region/    frozen bulk baseline, full-domain tracks (primary)
-├── baseline/                frozen bulk baseline, standard-ROI tracks (reference)
-├── stretch_inputs_tine_region/, stretch_inputs/   bulk fits for each global stretch input
+├── params_by_stretch_input.csv / .png, stretch_inputs_data.csv, stretch_inputs_histories.png
+│                            bulk fits for each global stretch input, full-domain tracks
+├── fit_stress_stretch_<input>.png           data and model, every protocol, one plot per input
+├── baseline/                frozen bulk baseline, full-domain tracks (primary)
+├── standard_roi/            the same on the standard ROI (--tracks standard), with its baseline/
 ├── fit_4pt_*                bulk fit to the CellScale 4-point tracking
 └── local/                   local estimation: local_data.npz, Stage 0 figures,
                              stage1*/, segmentation/, stage2_*/
@@ -29,7 +30,7 @@ constitutive_fit/
 | File | Purpose |
 |---|---|
 | `constitutive.py` | Four-fiber model: strain energy, plane-stress Cauchy stress for a general in-plane F, closed-form biaxial stress, and membrane first PK tension. `python constitutive.py` runs the self-checks |
-| `compare_stretch_inputs.py` | Fits the model for each global stretch input: CellScale 4-point, DIC 4-point, DIC region-mean λ, DIC affine F, DIC region edges, rake. Fits stay in the elastin-active family (C1_el > 0.1 kPa), with a protocol-level bootstrap. Options: `--tracks tine_region` or `standard`, `--width tine_span` or `specimen`, `--table-only` |
+| `compare_stretch_inputs.py` | Fits the model for each global stretch input: CellScale 4-point, DIC 4-point, DIC region-mean λ, DIC affine F, DIC region edges, rake. Fits stay in the elastin-active family (C1_el > 0.1 kPa), with a protocol-level bootstrap. `fit_stress_stretch_<input>.png` (one per input) plots the measured Cauchy stress (symbols: circles axial, triangles circumferential) and the model at the same stretches (solid lines) for every protocol on one plot; the plotted curves are lightly smoothed (5-frame running median, then an 11-frame Savitzky–Golay filter), the fit uses the raw data. All the plots of a sample share their axis limits. Options: `--tracks tine_region` or `standard`, `--width tine_span` or `specimen`, `--table-only`, `--plot-only` (redraws the plots from the saved results), `--plot-input` (default: one plot per input) |
 | `baseline.py` | `freeze` stores a frozen baseline: parameters, bootstrap 95% intervals, per-protocol errors, the exact data set, settings and checksums. `evaluate` scores any parameter set against it. Pass `tracks="tine_region"` for the primary baseline |
 | `check_preprocessing.py` | Sensitivity of a baseline to force taring and per-protocol Savitzky–Golay smoothing |
 | `fit_4pt.py` | Bulk fit to the CellScale 4-point tracking, with a frame-level bootstrap and a γ profile → `fit_4pt_*` |

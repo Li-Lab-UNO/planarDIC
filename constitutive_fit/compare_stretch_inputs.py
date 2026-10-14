@@ -14,9 +14,9 @@ Stretch inputs (all relative to the common reference):
     dic_edges   change in tracked-region axial length / circumferential width (edge rows/cols)
     rake        reported rake separation (X/Y_Size_um)
 
-Needs track_protocols.py output in Images/DefNN_*/strain_results/ (--tracks standard, the
-test's roi_px.standard) or track_tine_region.py output (--tracks tine_region, grid out to the
-tine tips; outputs go to stretch_inputs_tine_region/). --table-only writes the stretch table
+Needs the tracks in <test>/DIC_results/: the full-domain tracks out to the tine tips (--tracks
+tine_region, the default; outputs go to <test>/constitutive_fit/), or the test's roi_px.standard
+region (--tracks standard, sliced from the full-domain tracks; outputs go to constitutive_fit/standard_roi/). --table-only writes the stretch table
 and stops before any fitting.
 Loading branch: from the logged Stretch start to the rake peak (loading_end), which is the logged
 Recover start in every protocol except Def12, where the motion continues 0.5 s past it.
@@ -29,7 +29,7 @@ protocols with replacement, refit from the best solution); resamples that fall i
 elastin-off minimum are discarded and counted.
 
     ../.venv/bin/python compare_stretch_inputs.py --test N1739/test1
-Outputs: Images/constitutive_fit/stretch_inputs/
+Outputs: <test>/constitutive_fit/
 """
 import argparse
 import glob
@@ -69,7 +69,7 @@ def lam_from_F(F):
     return np.sqrt(C[0, 0]), np.sqrt(C[1, 1])
 
 
-TRACK_SUFFIX = {"standard": "", "tine_region": "_tine_region"}
+TRACK_SUBDIR = {"tine_region": "", "standard": "standard_roi"}   # output subfolder of constitutive_fit/
 LOADING_SLACK_S = D.LOADING_SLACK_S   # s past the logged Recover start searched for the rake peak
 
 
@@ -102,7 +102,7 @@ def build_table(sets, tracks="tine_region"):
         rc = ph[(ph.Set == s) & (ph.Phase == "Recover")].iloc[0]
         t0 = round(float(st["StartTime(s)"]), 1)
         t1 = loading_end(Dd, t0, round(float(rc["StartTime(s)"]), 1))
-        R, _ = D.load_track(IMAGES, fd, tracks)      # standard: sliced from the full domain if not tracked
+        R, _ = D.load_track(testcfg.get().results, fd, tracks)      # standard: sliced from the full domain if not tracked
         X0, shape, times = R["X0"], tuple(R["shape"]), np.round(R["times"], 1)
         pos, valid = R["pos"], R["valid"]
         win = D.window_points(float(R["step"]))
@@ -168,6 +168,82 @@ def fit(lz, lt, tzz, ttt, starts, rng, seeds=()):
     return best[1], 1 - best[0] / np.sum((y - y.mean()) ** 2), np.sqrt(best[0] / y.size)
 
 
+PLOT_MEDIAN = 5        # frames in the running median that removes isolated spikes from the plotted curves
+PLOT_SMOOTH = 11       # frames (2.2 s at 5 Hz) in the Savitzky-Golay window that then smooths them
+PLOT_SYMBOLS = 60      # about this many symbols per curve
+
+
+def plot_curves(df, inp, w_t, w_z, H):
+    """Per protocol: (set, label, lambda_z, lambda_theta, t_zz, t_thetatheta) for plotting, each smoothed along the
+    loading branch: a running median (PLOT_MEDIAN frames; leaves monotonic curves unchanged, removes isolated
+    spikes such as the CellScale 4-point jitter), then Savitzky-Golay (PLOT_SMOOTH frames, quadratic). Only for
+    display; the fit uses the raw data."""
+    from scipy.ndimage import median_filter
+    from scipy.signal import savgol_filter
+    out = []
+    for s in sorted(df.set.unique()):
+        d = df[df.set == s]
+        lz, lt = d[f"{inp}_z"].to_numpy(), d[f"{inp}_t"].to_numpy()
+        tzz, ttt = d.fz.to_numpy() * lz / (w_t * H), d.ft.to_numpy() * lt / (w_z * H)
+        win = min(PLOT_SMOOTH, len(d) - (1 - len(d) % 2))
+        if win >= 5:
+            lz, lt, tzz, ttt = (savgol_filter(median_filter(v, PLOT_MEDIAN, mode="nearest"), win, 2)
+                                for v in (lz, lt, tzz, ttt))
+        name = d.name.iloc[0].replace(" ratio", "").replace(" Save Cycle", " (save)")
+        out.append((s, f"{d.folder.iloc[0].split('_')[0]} {name}", lz, lt, tzz, ttt))
+    return out
+
+
+def plot_limits(a, df):
+    """Axis limits shared by the fit plots of every stretch input and every test of the sample: this test's
+    stretch table and those the sample's other tests have saved (each with its own thickness and widths)."""
+    T = testcfg.get()
+    sets = [(df, *WIDTHS[a.width], a.H)]
+    for td in testcfg.tests(os.path.dirname(T.root)):
+        O = testcfg.Test(os.path.join(os.path.dirname(T.root), td))
+        f = os.path.join(O.fit_dir, TRACK_SUBDIR[a.tracks], "stretch_inputs_data.csv")
+        w, H = O.config.get("widths_mm", {}).get(a.width), O.config.get("thickness_mm", {}).get("H")
+        if O.root != T.root and os.path.exists(f) and w and H:
+            sets.append((pd.read_csv(f), w[0], w[1], H))
+    xs, ys = [1.0], [0.0]
+    for d, w_t, w_z, H in sets:
+        for inp in INPUTS:
+            for _, _, lz, lt, tzz, ttt in plot_curves(d, inp, w_t, w_z, H):
+                xs += [lz.max(), lt.max()]
+                ys += [tzz.max(), ttt.max(), tzz.min(), ttt.min()]
+    x1, y0, y1 = max(xs), min(ys), max(ys)
+    return (0.99, x1 + 0.02 * (x1 - 0.99)), (min(y0, 0) - 0.03 * (y1 - y0), y1 * 1.04)
+
+
+def plot_fit(df, params, inp, w_t, w_z, H, out, title, lims):
+    """Measured Cauchy stress (symbols) and the model at the same stretches (solid lines), every protocol and
+    both directions on one plot: color = protocol, circles / t_zz vs lambda_z (axial), triangles /
+    t_thetatheta vs lambda_theta (circumferential). Curves are lightly smoothed (plot_curves)."""
+    cmap = plt.get_cmap("tab10")
+    fig, ax = plt.subplots(figsize=(9, 7), constrained_layout=True)
+    for i, (s, lab, lz, lt, tzz, ttt) in enumerate(plot_curves(df, inp, w_t, w_z, H)):
+        c = cmap(i % 10)
+        mzz, mtt = M.cauchy_biaxial(lz, lt, params)
+        every = max(len(lz) // PLOT_SYMBOLS, 1)
+        ax.plot(lz[::every], tzz[::every], "o", ms=3.5, mfc="none", mec=c, mew=0.9)
+        ax.plot(lt[::every], ttt[::every], "^", ms=3.5, mfc="none", mec=c, mew=0.9)
+        ax.plot(lz, mzz, "-", color=c, lw=1.4, label=lab)
+        ax.plot(lt, mtt, "-", color=c, lw=1.4)
+    from matplotlib.lines import Line2D
+    keys = [Line2D([], [], ls="none", marker="o", mfc="none", mec="k", label=r"axial: $t_{zz}$ vs $\lambda_z$"),
+            Line2D([], [], ls="none", marker="^", mfc="none", mec="k", label=r"circumferential: $t_{\theta\theta}$ vs $\lambda_\theta$"),
+            Line2D([], [], color="k", lw=1.4, label="model")]
+    leg = ax.legend(handles=keys, loc="upper left", fontsize=9, title="symbols: data")
+    ax.add_artist(leg)
+    ax.legend(loc="center left", fontsize=8.5, title="protocol (axial : circ. stretch)", title_fontsize=9)
+    ax.set_xlim(*lims[0]); ax.set_ylim(*lims[1])
+    ax.set_xlabel("stretch"); ax.set_ylabel("Cauchy stress (kPa)"); ax.grid(alpha=.3)
+    ax.set_title(title, fontsize=10.5)
+    fig.savefig(out, dpi=110)
+    plt.close(fig)
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--sets", default="2-10")
@@ -175,20 +251,31 @@ def main():
     ap.add_argument("--width", choices=tuple(WIDTHS), default="tine_span")
     ap.add_argument("--starts", type=int, default=150)
     ap.add_argument("--boot", type=int, default=200, help="protocol-level bootstrap resamples")
-    ap.add_argument("--tracks", choices=tuple(TRACK_SUFFIX), default="tine_region",
+    ap.add_argument("--tracks", choices=tuple(TRACK_SUBDIR), default="tine_region",
                     help="DIC tracks: standard ROI, or tine_region (grid out to the tine tips)")
     ap.add_argument("--table-only", action="store_true", help="write the stretch table, no fitting")
-    ap.add_argument("--out", default=None, help="default constitutive_fit/stretch_inputs[_tine_region]")
+    ap.add_argument("--plot-only", action="store_true",
+                    help="redraw the fit plot from the saved stretch table and parameters, no fitting")
+    ap.add_argument("--plot-input", nargs="+", choices=INPUTS + ["all"], default=["all"],
+                    help="stretch inputs to draw a fit plot for (default: all, one plot each)")
+    ap.add_argument("--out", default=None, help="default <test>/constitutive_fit[/standard_roi]")
     a = ap.parse_args()
     if a.H is None or a.width not in WIDTHS:
         sys.exit("set thickness_mm.H and widths_mm in the test's test_config.json (or pass --H)")
-    a.out = a.out or os.path.join(IMAGES, "constitutive_fit", "stretch_inputs" + TRACK_SUFFIX[a.tracks])
+    a.out = a.out or os.path.join(testcfg.get().fit_dir, TRACK_SUBDIR[a.tracks])
     np.seterr(over="ignore", invalid="ignore")
     os.makedirs(a.out, exist_ok=True)
     lo_, _, hi_ = a.sets.partition("-")
     sets = list(range(int(lo_), int(hi_ or lo_) + 1))
 
     cache = os.path.join(a.out, "stretch_inputs_data.csv")
+    if a.plot_only:
+        P, df = pd.read_csv(os.path.join(a.out, "params_by_stretch_input.csv")).set_index("input"), pd.read_csv(cache)
+        lims = plot_limits(a, df)
+        for inp in plot_inputs(a):
+            print("wrote", fit_plot(a, df, inp, P.loc[inp, list(M.PARAM_NAMES)].to_numpy(float),
+                                    P.loc[inp, "R2"], P.loc[inp, "rms_kPa"], lims))
+        return
     print("building stretch table (DIC, CellScale, rake)")
     df, ref = build_table(sets, a.tracks)
     df.to_csv(cache, index=False)
@@ -272,28 +359,25 @@ def main():
                  "(dots: best fit; bars: protocol-level bootstrap 95%)")
     fig.savefig(os.path.join(a.out, "params_by_stretch_input.png"), dpi=90)
 
-    # 3) model responses along three reference paths, each input's parameters
-    fig, ax = plt.subplots(1, 3, figsize=(17, 5), constrained_layout=True, sharey=True)
-    lz_ = np.linspace(1, 1.35, 100); lt_ = np.linspace(1, 1.175, 100)
-    for inp in INPUTS:
-        p = results[inp]["best"]
-        mz, mt = M.cauchy_biaxial(lz_, lt_, p)                       # proportional (equibiaxial-type) path
-        ax[0].plot(lz_, mz, color=cols[inp], lw=1.6, label=LABELS[inp])
-        ax[0].plot(lt_, mt, color=cols[inp], lw=1.6, ls="--")
-        mz, _ = M.cauchy_biaxial(lz_, np.ones_like(lz_), p)           # axial only
-        ax[1].plot(lz_, mz, color=cols[inp], lw=1.6)
-        _, mt = M.cauchy_biaxial(np.ones_like(lt_), lt_, p)           # circumferential only
-        ax[2].plot(lt_, mt, color=cols[inp], lw=1.6, ls="--")
-    ax[0].set_title(r"proportional path to $\lambda_z$ = 1.35, $\lambda_\theta$ = 1.175" "\n"
-                    r"(solid $t_{zz}$ vs $\lambda_z$, dashed $t_{\theta\theta}$ vs $\lambda_\theta$)", fontsize=10)
-    ax[1].set_title(r"axial only ($\lambda_\theta$ = 1): $t_{zz}$ vs $\lambda_z$", fontsize=10)
-    ax[2].set_title(r"circumferential only ($\lambda_z$ = 1): $t_{\theta\theta}$ vs $\lambda_\theta$", fontsize=10)
-    for a_ in ax:
-        a_.set_xlabel("stretch"); a_.grid(alpha=.3)
-    ax[0].set_ylabel("model Cauchy stress (kPa)"); ax[0].legend(fontsize=8)
-    fig.suptitle("Model response from each input's parameters (elastin-active solution)")
-    fig.savefig(os.path.join(a.out, "model_response_by_stretch_input.png"), dpi=90)
+    lims = plot_limits(a, df)
+    for inp in plot_inputs(a):
+        fit_plot(a, df, inp, results[inp]["best"], results[inp]["R2"], results[inp]["rms"], lims)
     print("\nwrote", a.out)
+
+
+def plot_inputs(a):
+    return INPUTS if "all" in a.plot_input else a.plot_input
+
+
+def fit_plot(a, df, inp, params, r2, rms, lims):
+    """fit_stress_stretch_<input>.png in a.out (see plot_fit)."""
+    w_t, w_z = WIDTHS[a.width]
+    T = testcfg.get()
+    # sample label without the test date and "labeled": "N1739 LFPA, test1 (08/25/2026), labeled healthy" -> "N1739 LFPA, test1, healthy"
+    label = re.sub(r"\s*\(\d{1,2}/\d{1,2}/\d{2,4}\)", "", T.config.get("sample", T.name)).replace("labeled ", "")
+    title = (f"{label}: {LABELS[inp]} stretches\n"
+             f"H = {a.H:.3g} mm, {a.width.replace('_', ' ')} {w_t:.2f} / {w_z:.2f} mm; R$^2$ = {r2:.4f}, RMSE {rms:.2f} kPa")
+    return plot_fit(df, params, inp, w_t, w_z, a.H, os.path.join(a.out, f"fit_stress_stretch_{inp}.png"), title, lims)
 
 
 if __name__ == "__main__":

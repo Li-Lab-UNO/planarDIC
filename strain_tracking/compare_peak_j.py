@@ -16,6 +16,7 @@ Output: comparisons/peak_J_<samples>_w<L>mm[_edge<Z>x<TH>mm].png / .csv
 import argparse
 import glob
 import os
+import re
 import sys
 
 import matplotlib
@@ -44,8 +45,10 @@ def tests_of(sample):
     for t in sorted(glob.glob(os.path.join(folder[0], "test*_*"))):
         if not os.path.exists(os.path.join(t, "test_config.json")):
             continue
-        missing = [d for d in DEFS if not glob.glob(os.path.join(t, "Images", f"{d}_*", "strain_results",
-                                                                  f"{d}_*_tine_region.npz"))]
+        folders = {f.split("_")[0]: f for f in os.listdir(os.path.join(t, "Images")) if re.match(r"Def\d+_", f)} \
+            if os.path.isdir(os.path.join(t, "Images")) else {}
+        missing = [d for d in DEFS if d not in folders
+                   or not os.path.exists(os.path.join(t, "DIC_results", folders[d] + ".npz"))]
         if missing:
             print(f"{sample} {os.path.basename(t)}: left out, no track for {', '.join(missing)}")
             continue

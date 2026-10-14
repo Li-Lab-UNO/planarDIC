@@ -3,7 +3,7 @@ Frozen bulk (homogeneous) four-fiber baseline for comparing future parameterizat
 e.g. local strain-based or zone-based fits.
 
 freeze   Copy the current compare_stretch_inputs.py results into
-         Images/constitutive_fit/baseline/ together with the exact data set
+         <test>/constitutive_fit/baseline/ together with the exact data set
          (stretches, tared forces, stresses), the settings, per-protocol errors, and
          SHA-256 checksums of the data and the scripts that produced them.
          Primary baseline input: DIC affine F; the other inputs are kept for context.
@@ -11,7 +11,7 @@ evaluate Score any parameter set on the frozen data set with the same stress def
          overall R^2 / RMS and per-protocol RMS, side by side with the baseline.
 
     ../.venv/bin/python baseline.py --test N1739/test1 freeze
-    ../.venv/bin/python baseline.py --test N1739/test1 freeze --tracks tine_region     (baseline_tine_region/)
+    ../.venv/bin/python baseline.py --test N1739/test1 freeze --tracks standard     (standard_roi/baseline/)
     ../.venv/bin/python baseline.py --test N1739/test1 evaluate --params "5.9,3.6,1.8,9.4,9.9,1.8,7.2,49"
     ../.venv/bin/python baseline.py --test N1739/test1 evaluate --params-json my_fit.json --input dic_affine
 
@@ -37,12 +37,12 @@ import testcfg  # noqa: E402
 import constitutive as M  # noqa: E402
 
 TC = testcfg.get()
-IMAGES = TC.images
-SRC = os.path.join(IMAGES, "constitutive_fit", "stretch_inputs")
-OUT = os.path.join(IMAGES, "constitutive_fit", "baseline")
+SRC = TC.fit_dir                                   # compare_stretch_inputs.py output
+OUT = os.path.join(TC.fit_dir, "baseline")
 # DIC tracks -> (stretch_inputs folder, baseline folder, ROI setting of the tracked grid)
-TRACKS = {"standard": (SRC, OUT, TC.config.get("roi_px", {}).get("standard")),
-          "tine_region": (SRC + "_tine_region", OUT + "_tine_region", TC.config.get("roi_px", {}).get("tine_region"))}
+TRACKS = {"tine_region": (SRC, OUT, TC.config.get("roi_px", {}).get("tine_region")),
+          "standard": (os.path.join(SRC, "standard_roi"), os.path.join(SRC, "standard_roi", "baseline"),
+                       TC.config.get("roi_px", {}).get("standard"))}
 PRIMARY = "dic_affine"
 SCRIPTS = ["dic2d.py", "track_protocols.py", "compare_stretch_inputs.py", "constitutive.py", "baseline.py"]
 
@@ -117,7 +117,7 @@ def freeze(H=None, H_sd=None, widths=None, tracks="tine_region"):
     # human-readable table
     rows = [dict(input=k, label=v["label"], R2=v["R2"], rms_kPa=v["rms_kPa"], **v["params"]) for k, v in inputs.items()]
     pd.DataFrame(rows).to_csv(os.path.join(OUT, "baseline_params.csv"), index=False)
-    for fn in ("params_by_stretch_input.png", "model_response_by_stretch_input.png"):
+    for fn in ("params_by_stretch_input.png", "fit_stress_stretch_dic_affine.png"):
         if os.path.exists(os.path.join(SRC, fn)):
             shutil.copyfile(os.path.join(SRC, fn), os.path.join(OUT, fn))
     print(f"baseline frozen in {OUT} (primary input: {PRIMARY})")

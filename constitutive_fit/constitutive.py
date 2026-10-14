@@ -15,11 +15,11 @@ Incompressible membrane under plane stress (t_rr = 0):
     p = Cgr * lambda_r^2,  lambda_r = 1 / det(F_inplane)
 
 Parameter vector (stresses in kPa, gamma in degrees):
-    P = [Cgr, C1_el, C2_el, C1_smc, C2_smc, C1_col, C2_col, gamma_deg]
+    P = [Cgr, C1_el, C2_el, C1_smc, C2_smc, C1_col, C2_col, gamma]
 """
 import numpy as np
 
-PARAM_NAMES = ("Cgr", "C1_el", "C2_el", "C1_smc", "C2_smc", "C1_col", "C2_col", "gamma_deg")
+PARAM_NAMES = ("Cgr", "C1_el", "C2_el", "C1_smc", "C2_smc", "C1_col", "C2_col", "gamma")
 PARAM_UNITS = ("kPa", "kPa", "-", "kPa", "-", "kPa", "-", "deg")
 
 

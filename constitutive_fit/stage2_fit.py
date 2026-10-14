@@ -24,7 +24,7 @@ Checks
   * window sensitivity: the combined fit repeated with the 75 px window
 
     ../.venv/bin/python stage2_fit.py --test N1739/test1 [--every 4] [--fe-every 32]
-Outputs: Images/constitutive_fit/local/stage2_fit/
+Outputs: <test>/constitutive_fit/local/stage2_fit/
 """
 import argparse
 import json

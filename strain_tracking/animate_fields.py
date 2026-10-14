@@ -16,7 +16,7 @@ marker for the current frame. Outputs go next to the .npz as
 Axes: image x = axial (z); circumferential theta increases upward (theta = -image y).
 Maps are drawn on the photo, so the picture keeps its image orientation.
 
-    ../.venv/bin/python animate_fields.py ../N1739_LFPA/test1_08252026_PLC25_38-20/Images/Def11_Equibiaxial/strain_results/Def11_Equibiaxial_tine_region.npz
+    ../.venv/bin/python animate_fields.py ../N1739_LFPA/test1_08252026_PLC25_38-20/DIC_results/Def11_Equibiaxial.npz
     ../.venv/bin/python animate_fields.py <npz> --quantity stretch strain --fps 30
 """
 import argparse
@@ -75,7 +75,8 @@ if "branch" in R and str(R["branch"]) == "loading":
 X0, shape, times = R["X0"], tuple(R["shape"]), R["times"]
 pos, valid = R["pos"], R["valid"]
 T = len(times)
-img_dir = os.path.dirname(out_dir)                      # Images/DefNN_*/
+TC = testcfg.get()
+img_dir = os.path.join(TC.images, TC.folder(tag.split("_")[0])) if tag.startswith("Def") else TC.images
 img_paths = [os.path.join(img_dir, p) if os.path.exists(os.path.join(img_dir, p))
              else glob.glob(os.path.join(TEST_ROOT, "Images", "**", p), recursive=True)[0]
              for p in R["paths"]]

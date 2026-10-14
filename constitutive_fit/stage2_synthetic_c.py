@@ -16,7 +16,7 @@ The single-factor truth from stage2_synthetic.py (alpha = Stage 1 pattern, fe_st
 as the reference.
 
     ../.venv/bin/python stage2_synthetic_c.py --test N1739/test1 [--noise 0 0.03]
-Outputs: Images/constitutive_fit/local/stage2_synthetic/ (fe_exp_*.npz, stage2_synthetic_c.*)
+Outputs: <test>/constitutive_fit/local/stage2_synthetic/ (fe_exp_*.npz, stage2_synthetic_c.*)
 """
 import argparse
 import json

@@ -4,8 +4,8 @@ Thickness, …/Thickess measurements.xlsx (5 caliper lines on each of 2 images p
 
 Each image is matched by the photo name in its label (e.g. "Image 1 (DSC_8630)"). The
 N1739 workbook's labels were copied from N1690's and name no N1739 photo, so there
-image 1 / image 2 are the first / second photo (by name) in the test's folder. The automatic value per image is its selected strip (see measure_thickness.py); every
-strip is listed in the CSV.
+image 1 / image 2 are the first / second photo (by name) in the test's folder. The automatic value per image
+pools the stations of its selected strips (see measure_thickness.py); unselected strips are listed in the CSV.
 
     .venv/bin/python thickness/compare_manual.py
 
@@ -15,6 +15,7 @@ comparisons/thickness_auto_vs_manual.csv (per image), _by_test.csv and .png.
 import glob
 import os
 import re
+import sys
 
 import matplotlib
 matplotlib.use("Agg")
@@ -24,6 +25,8 @@ import openpyxl  # noqa: E402
 import pandas as pd  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import measure_thickness as MT  # noqa: E402
 OUT = os.path.join(ROOT, "comparisons")
 
 
@@ -64,7 +67,8 @@ def main():
         for t, imgs in sorted(readings.items()):
             tdir = [d for d in glob.glob(os.path.join(os.path.dirname(xlsx), "*"))
                     if os.path.isdir(d) and re.sub(r"\D", "", os.path.basename(d)) == str(t)][0]
-            summ = os.path.join(tdir, "thickness_auto", "summary.csv")
+            odir = MT.output_location(tdir)
+            summ = os.path.join(odir, "summary.csv")
             auto = pd.read_csv(summ)
             photos = sorted(f for f in os.listdir(tdir) if f.lower().endswith((".jpg", ".jpeg")))
             pooled_auto = []
@@ -75,18 +79,17 @@ def main():
                 img = named[0] if named else photos[k]
                 a = auto[auto.image == img]
                 c = a[a.selected]
-                st = pd.read_csv(os.path.join(tdir, "thickness_auto",
-                                              f"{os.path.splitext(img)[0]}_strip{int(c.strip.iloc[0])}_stations.csv"))
-                st = st[st.ok]
-                pooled_auto.append(st.thickness_mm.values)
+                v = np.concatenate([pd.read_csv(os.path.join(odir, f"{os.path.splitext(img)[0]}_strip{int(k)}_stations.csv"))
+                                    .query("ok").thickness_mm.values for k in c.strip])
+                pooled_auto.append(v)
                 per_image.append(dict(
                     sample=sample, test=t, image=img, by="label" if named else "order",
                     manual_mean=np.mean(man),
                     manual_sd=np.std(man, ddof=1), manual_n=len(man),
-                    auto_mean=c.mean_mm.iloc[0], auto_sd=c.sd_mm.iloc[0],
-                    auto_median=c.median_mm.iloc[0], auto_n=int(c.n_stations.iloc[0]),
+                    auto_mean=v.mean(), auto_sd=v.std(ddof=1), auto_median=np.median(v), auto_n=len(v),
+                    auto_strips=", ".join(str(int(k)) for k in c.strip),
                     auto_px_per_mm=c.px_per_mm.iloc[0], selected_by=c.selected_by.iloc[0],
-                    diff_mm=c.mean_mm.iloc[0] - np.mean(man),
+                    diff_mm=v.mean() - np.mean(man),
                     other_strips="; ".join(f"{int(r.strip)}: {r.mean_mm:.2f}±{r.sd_mm:.2f}"
                                            for r in a[~a.selected].itertuples())))
             man_all = np.concatenate([m for _, m in imgs])
@@ -109,7 +112,7 @@ def main():
                     capsize=3, label=s)
     lim = [0.8, 3.6]
     ax.plot(lim, lim, "k--", lw=0.8)
-    ax.set(xlim=lim, ylim=lim, xlabel="manual (mm, 5 lines)", ylabel="automatic (mm, selected strip)",
+    ax.set(xlim=lim, ylim=lim, xlabel="manual (mm, 5 lines)", ylabel="automatic (mm, selected strips)",
            title="per image, mean ± SD")
     ax.legend()
     ax = axes[1]

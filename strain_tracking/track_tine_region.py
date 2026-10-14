@@ -7,7 +7,7 @@ ending 5-15 px inside the tips; the standard 37 x 32 grid is rows 2:-2, cols 2:-
 Other scripts import ROI, TINE_TIPS and SUFFIX from here.
 
     ../.venv/bin/python track_tine_region.py --test N1739/test1
-Outputs: Images/DefNN_*/strain_results/DefNN_*_tine_region.npz
+Outputs: <test>/DIC_results/DefNN_*.npz
 """
 import argparse
 import os

@@ -2,7 +2,7 @@
 Compare strain bands across tests at the peak of one deformation.
 
 For each test, the exported fields of the full-domain track (export_fields.py on
-DefNN_*_tine_region.npz) are taken at the frame where the mean axial stretch peaks. Maps are
+DefNN_*.npz) are taken at the frame where the mean axial stretch peaks. Maps are
 drawn on the reference grid in mm from the left (z) and bottom (theta) tine tips, theta up.
 
 Band measures, per test (valid field points only):
@@ -39,7 +39,7 @@ OUT = os.path.join(testcfg.ROOT, "comparisons")
 def load(test, defn, suffix):
     T = testcfg.Test(testcfg._resolve(test))
     fd = T.folder(defn)
-    p = os.path.join(T.images, fd, "strain_results", f"{fd}{suffix}_fields.npz")
+    p = os.path.join(T.results, f"{fd}{suffix}_fields.npz")
     if not os.path.exists(p):
         sys.exit(f"missing {p}; run export_fields.py on {fd}{suffix}.npz first")
     d = np.load(p, allow_pickle=True)
@@ -74,7 +74,7 @@ def main():
     ap.add_argument("--tests", nargs="+", default=["test1", "test2", "test3"],
                     help="test names in --sample, or SAMPLE/TEST")
     ap.add_argument("--def", dest="defn", default="Def11")
-    ap.add_argument("--suffix", default="_tine_region", help="track suffix ('' for the standard grid)")
+    ap.add_argument("--suffix", default="", help="track suffix ('_standard' for the standard grid)")
     a = ap.parse_args()
     R = [load(t if "/" in t else f"{a.sample}/{t}", a.defn, a.suffix) for t in a.tests]
     n = len(R)

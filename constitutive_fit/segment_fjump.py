@@ -32,7 +32,7 @@ Image axes: the segmentation is invariant to the sign of theta. Plots use theta 
 measured from the bottom tine tips.
 
     ../.venv/bin/python segment_fjump.py --test N1739/test1 [--max-parts 10] [--frames 5] [--unscaled] [--uniform-jump]
-Outputs: Images/constitutive_fit/local/segmentation/
+Outputs: <test>/constitutive_fit/local/segmentation/
     segmentation.npz      element geometry, summed and per-protocol jumps, labels for every partition
     segmentation.json     partitions (sizes, modularity, removal step) and settings
     fjump_segmentation.png  summed jump map, modularity, partitions for 2..max-parts subdomains
@@ -58,8 +58,7 @@ import baseline as B  # noqa: E402
 import dic2d as D  # noqa: E402
 from track_tine_region import SUFFIX, TINE_TIPS  # noqa: E402
 
-IMAGES = testcfg.get().images
-OUT = os.path.join(IMAGES, "constitutive_fit", "local", "segmentation")
+OUT = os.path.join(testcfg.get().local_dir, "segmentation")
 
 
 def node_lines(n, stride):
@@ -151,7 +150,7 @@ def main():
     # ---------------------------------------------------------------- jumps per protocol
     jumps, folders = [], list(dict.fromkeys(df.folder))
     for fd in folders:
-        R = np.load(os.path.join(IMAGES, fd, "strain_results", fd + SUFFIX + ".npz"), allow_pickle=True)
+        R = np.load(os.path.join(testcfg.get().results, fd + SUFFIX + ".npz"), allow_pickle=True)
         X0, shape, times = R["X0"], tuple(R["shape"]), np.round(R["times"], 1)
         rows, cols = node_lines(shape[0], a.stride), node_lines(shape[1], a.stride)
         kmap = {t: k for k, t in enumerate(times)}

@@ -2,15 +2,14 @@
 Track a grid of material points through a CellScale image sequence, referenced to its own first
 frame. (For Def11-19 against the test's common reference, use track_protocols.py.)
 The grid defaults to the full domain between the tine tips (--grid tine_region, output
-<name>_tine_region[_tag].npz); --grid standard uses roi_px.standard (output <name>[_tag].npz).
+<name>[_tag].npz); --grid standard uses roi_px.standard (output <name>_standard[_tag].npz).
 An existing common-reference track (from track_protocols.py) is never overwritten.
 
-Track a whole deformation folder; results go to Images/DefNN_*/strain_results/:
+Track a whole deformation folder; results go to <test>/DIC_results/:
     ../.venv/bin/python track.py --test N1739/test1 --def Def01
     ../.venv/bin/python track.py --test N1739/test1 --def Def13 --radius 40 --step 20 --tag s81_g20
 
-Or an arbitrary time window across all of Images/ (saved in the strain_results
-folder of the deformation containing the first frame):
+Or an arbitrary time window across all of Images/ (saved in DIC_results/ as t<t0>-<t1>...npz):
     ../.venv/bin/python track.py --test N1739/test1 --t0 893 --t1 913
 """
 import argparse
@@ -45,7 +44,7 @@ ap.add_argument("--mask-saturated", action=argparse.BooleanOptionalAction,
                 default=T.config.get("dic", {}).get("mask_saturated", False),
                 help="leave saturated glint pixels out of the matching (default: the test's dic.mask_saturated)")
 ap.add_argument("--tag", default="", help="suffix for the output name, e.g. r30")
-ap.add_argument("--out", help="output .npz (default: Images/<deformation>/strain_results/<name><grid suffix>[_tag].npz)")
+ap.add_argument("--out", help="output .npz (default: <test>/DIC_results/<name><grid suffix>[_tag].npz)")
 a = ap.parse_args()
 a.roi = a.roi or T.setting("roi_px", a.grid)
 
@@ -63,7 +62,7 @@ if not paths:
     sys.exit("no frames found")
 if a.out is None:
     stem = name + D.GRID_SUFFIX[a.grid] + (f"_{a.tag}" if a.tag else "")
-    a.out = os.path.join(os.path.dirname(paths[0]), "strain_results", stem + ".npz")
+    a.out = os.path.join(T.results, stem + ".npz")
 if os.path.exists(a.out) and "X_start" in np.load(a.out).files:
     sys.exit(f"{a.out} is a common-reference track (track_protocols.py); choose --tag or --out")
 print(f"{len(paths)} frames, t = {times[0]:.1f} .. {times[-1]:.1f} s")

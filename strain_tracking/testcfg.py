@@ -24,7 +24,9 @@ Per-test settings live in <test folder>/test_config.json (make_config.py drafts 
     reference_deformation  deformation whose first frame is the common reference, e.g. "Def11"
     dic                    optional tracker settings, e.g. {"mask_saturated": true, "exclude_px": [...]}
     notes                  caveats (dropped frames, scale uncertainty, ...), printed by status.py --notes
-The image scale is in <test folder>/scale_calibration.json (calibrate_scale.py).
+The image scale is in <test folder>/scale_calibration.json (calibrate_scale.py). Outputs go to
+<test folder>/DIC_results/ (tracks, exports and figures, named by deformation) and
+<test folder>/constitutive_fit/; Images/ holds only the images and sort_manifest.csv.
 
 In Python:  import testcfg; testcfg.select("N1739/test1"); T = testcfg.get()
 """
@@ -108,7 +110,8 @@ class Test:
         self.name = os.path.basename(self.root)                     # e.g. test1_08252026_PLC25_38-20
         self.sample = os.path.basename(os.path.dirname(self.root))  # e.g. N1739_LFPA
         self.images = os.path.join(self.root, "Images")
-        self.fit_dir = os.path.join(self.images, "constitutive_fit")
+        self.results = os.path.join(self.root, "DIC_results")     # tracks, exports, figures
+        self.fit_dir = os.path.join(self.root, "constitutive_fit")
         self.local_dir = os.path.join(self.fit_dir, "local")
         self.scale_file = os.path.join(self.root, "scale_calibration.json")
         self.config_file = os.path.join(self.root, "test_config.json")

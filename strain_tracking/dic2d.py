@@ -36,7 +36,7 @@ from scipy.spatial import cKDTree
 
 # Threads per process. Subsets are matched independently, so icgn() splits them into chunks matched in
 # parallel threads (NumPy and OpenCV release the GIL in the array work), and track_sequence() reads the next
-# image while matching. DIC_THREADS sets the count (default: every CPU); run_pipeline.sh gives each of its
+# image while matching. DIC_THREADS sets the count (default: every CPU); runDIC.sh gives each of its
 # parallel jobs a share. OpenCV's own threads are limited to match, so jobs and chunks don't oversubscribe
 # the CPUs: none when the chunks run in parallel, one per job otherwise (macOS builds use Grand Central
 # Dispatch, which ignores a limit of 1).
@@ -272,7 +272,7 @@ def shift_rects(rects, X0, x, valid):
 DEFAULT_STEP = 15          # grid spacing (px)
 # Track files per grid: the full domain (roi_px.tine_region, the default) and the standard region
 # (roi_px.standard = the full domain without its outer STANDARD_TRIM rows and columns).
-GRID_SUFFIX = {"tine_region": "_tine_region", "standard": ""}
+GRID_SUFFIX = {"tine_region": "", "standard": "_standard"}   # track file: <deformation folder><suffix>.npz
 STANDARD_TRIM = 2
 STRAIN_WINDOW_PX = 75      # side of the square strain-fit window (px)
 
@@ -479,12 +479,13 @@ def standard_from_full(R, trim=STANDARD_TRIM):
     return out
 
 
-def load_track(images, folder, grid="tine_region"):
+def load_track(results, folder, grid="tine_region"):
     """
-    (track dict, path) for deformation `folder` on `grid` ("tine_region" or "standard").
-    A standard track that was not tracked separately is sliced from the full-domain one.
+    (track dict, path) for deformation `folder` on `grid` ("tine_region" or "standard"), from the
+    test's DIC_results folder `results`. A standard track that was not tracked separately is
+    sliced from the full-domain one.
     """
-    base = os.path.join(images, folder, "strain_results", folder)
+    base = os.path.join(results, folder)
     path = base + GRID_SUFFIX[grid] + ".npz"
     if os.path.exists(path):
         return dict(np.load(path, allow_pickle=True)), path

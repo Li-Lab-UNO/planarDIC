@@ -27,7 +27,7 @@ statistics, the diagnostics and the example fits, so the interior pattern can be
 
     ../.venv/bin/python stage1_patches.py --test N1739/test1                    -> local/stage1/
     ../.venv/bin/python stage1_patches.py --test N1739/test1 --exclude-ring 1   -> local/stage1_interior1/
-Outputs: Images/constitutive_fit/local/stage1[_interiorN]/
+Outputs: <test>/constitutive_fit/local/stage1[_interiorN]/
     stage1_patches.csv     per-patch alpha, alpha_z, alpha_theta, 95% intervals, RMS, coverage
     stage1_results.npz     the same as arrays [theta row, z column], plus the patch-mean F
     stage1_maps.png        alpha, alpha_theta, alpha_z maps, interval width, RMS, alpha_z / alpha_theta
@@ -54,8 +54,7 @@ import testcfg  # noqa: E402
 import baseline as B  # noqa: E402
 import constitutive as M  # noqa: E402
 
-IMAGES = testcfg.get().images
-LOCAL = os.path.join(IMAGES, "constitutive_fit", "local")
+LOCAL = testcfg.get().local_dir
 
 
 def load_inputs(inp="dic_affine"):

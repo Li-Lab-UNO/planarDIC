@@ -18,7 +18,7 @@ The color scale is fixed (--vmin/--vmax, default 0.8-1.2) so specimens can be co
     ../.venv/bin/python peak_j_figure.py --test N1739/test1
     ../.venv/bin/python peak_j_figure.py --test N1690/test1 --window-mm 1.4   (another physical window)
     ../.venv/bin/python peak_j_figure.py --test N1739/test3 --edge-mm 1.6 2.0   (another interior)
-Output: <test>/Images/peak_J_over_mean_Def11-19[_w<L>mm | _box<N>px][_edge<Z>x<TH>mm].png (and a .csv of the
+Output: <test>/DIC_results/peak_J_over_mean_Def11-19[_w<L>mm | _box<N>px][_edge<Z>x<TH>mm].png (and a .csv of the
 per-protocol numbers, with the interior edges used); no suffix = the analysis_settings.json window and interior
 """
 import argparse
@@ -59,7 +59,7 @@ def peak_J(T, defn, window_mm=None, box_px=None, edge_mm=None, R=None):
     window_mm = window_mm or S["window_mm"]
     edge_mm = testcfg.edge_mm(edge_mm)
     if R is None:
-        R, _ = D.load_track(T.images, T.folder(defn), "tine_region")
+        R, _ = D.load_track(T.results, T.folder(defn), "tine_region")
     X0, sh = R["X0"], tuple(R["shape"])
     mpp = D.load_scale(T.scale_file)["mm_per_px"]
     best = (-1.0, 0)
@@ -231,7 +231,8 @@ def main():
              fontsize=9.5, color=MUTED, va="top")
     tag = f"_box{a.box_px}px" if a.box_px else (f"_w{a.window_mm:g}mm" if a.window_mm else "")
     tag += f"_edge{ez:g}x{et:g}mm" if a.edge_mm else ""
-    out = os.path.join(T.images, "peak_J_over_mean_Def11-19" + tag + ".png")
+    out = os.path.join(T.results, "peak_J_over_mean_Def11-19" + tag + ".png")
+    os.makedirs(T.results, exist_ok=True)
     fig.savefig(out, dpi=110, facecolor=SURF)
     df = pd.DataFrame(rows)
     df.to_csv(out[:-4] + ".csv", index=False)

@@ -16,13 +16,13 @@ as a red/blue pair in J. Here they are found and confirmed without a person look
 3. Fix. Each confirmed cluster's bounding box (reference-frame px, grown by half a grid step) is added to
    dic.exclude_px in test_config.json, with a note. Those pixels get zero weight in the matching and the
    neighboring subsets track on the rest (see README, Excluded regions). The test then has to be tracked
-   again (run_pipeline.sh does this).
+   again (runDIC.sh does this).
 
     ../.venv/bin/python artifact_check.py --test N1739/test3
     ../.venv/bin/python artifact_check.py --test N1739/test3 --report-only
-    ../.venv/bin/python artifact_check.py --test N1739/test3 --track other_Def11_tine_region.npz --report-only
+    ../.venv/bin/python artifact_check.py --test N1739/test3 --track other_Def11.npz --report-only
 Exit status: 0 nothing to change, 3 test_config.json updated (track the test again).
-Output: <test>/Images/<reference>/strain_results/artifact_check.png
+Output: <test>/DIC_results/artifact_check.png
 """
 import argparse
 import os
@@ -166,7 +166,7 @@ def main():
     T = testcfg.get()
     ref = T.config.get("reference_deformation", "Def11")
     folder = T.folder(ref)
-    R = dict(np.load(a.track, allow_pickle=True)) if a.track else D.load_track(T.images, folder, "tine_region")[0]
+    R = dict(np.load(a.track, allow_pickle=True)) if a.track else D.load_track(T.results, folder, "tine_region")[0]
     _, paths = D.find_frames([os.path.join(T.images, folder)])
     mpp = D.load_scale(T.scale_file)["mm_per_px"]
     found, res, z, th, info = check(T, R, paths, mpp)
@@ -179,7 +179,7 @@ def main():
     conf = [c for c in found if c["confirmed"]]
     if not found:
         print("  no candidate clusters")
-    out = os.path.join(T.images, folder, "strain_results", "artifact_check.png")
+    out = os.path.join(T.results, "artifact_check.png")
     figure(out, res, z, th, found, info, f"{T.config.get('sample', T.name)}: tracking artifact check ({ref} peak)")
     print("wrote", out)
     if not conf or a.report_only:
