@@ -50,7 +50,8 @@ out_dir = os.path.dirname(os.path.abspath(a.npz))
 tag = os.path.splitext(os.path.basename(a.npz))[0]
 
 R = np.load(a.npz, allow_pickle=True)
-if "branch" in R and str(R["branch"]) == "loading":
+LOADING_ONLY = "branch" in R and str(R["branch"]) == "loading"
+if LOADING_ONLY:
     print("track holds the loading branch only (track_protocols.py --loading-only)")
 MPP_ = D.load_scale()["mm_per_px"]
 X0, shape, times = R["X0"], tuple(R["shape"]), R["times"]
@@ -134,8 +135,11 @@ print(diff.round(4).to_string())
 print(f"\nPoint-position difference DIC vs CellScale (px): "
       f"median {np.median(d_pts):.2f}, 95th pct {np.percentile(d_pts, 95):.2f}, "
       f"max {d_pts.max():.2f}")
-print("Closure error, last vs first frame (px), points TL,TR,BR,BL:")
-print("  CellScale", np.round(closure_cs, 2), "  DIC", np.round(closure_dic, 2))
+if LOADING_ONLY:
+    print("Closure error: not computed (the track ends at the rake peak, not back at rest)")
+else:
+    print("Closure error, last vs first frame (px), points TL,TR,BR,BL:")
+    print("  CellScale", np.round(closure_cs, 2), "  DIC", np.round(closure_dic, 2))
 print(f"DIC valid points per frame: median {np.median(valid.mean(1))*100:.1f}%, "
       f"min {valid.mean(1).min()*100:.1f}%; keyframes {len(R['keyframes'])}")
 
@@ -201,6 +205,19 @@ h, w = img.shape[:2]
 (ex0, ex1), (ey1, ey0) = D.specimen_mm([0, w], [0, h], tips, MPP_)   # image extent in specimen mm
 qz, qt = D.specimen_mm(*np.vstack([P_cs[k_peak], P_cs[k_peak][:1]]).T, tips, MPP_)
 
+
+def cell_corners(A):
+    """Corners (ny+1, nx+1) of the cells centered on a curvilinear grid A (ny, nx): the borders extrapolated
+    linearly, then the mean of each 2 x 2 block (pcolormesh needs corners on a deformed grid)."""
+    P = np.empty((A.shape[0] + 2, A.shape[1] + 2))
+    P[1:-1, 1:-1] = A
+    P[0, 1:-1], P[-1, 1:-1] = 2 * A[0] - A[1], 2 * A[-1] - A[-2]
+    P[:, 0], P[:, -1] = 2 * P[:, 1] - P[:, 2], 2 * P[:, -2] - P[:, -3]
+    return 0.25 * (P[:-1, :-1] + P[1:, :-1] + P[:-1, 1:] + P[1:, 1:])
+
+
+Xe, Ye = cell_corners(Xd), cell_corners(Yd)
+
 fig, ax = plt.subplots(1, 3, figsize=(16, 6), constrained_layout=True)
 for i in range(3):
     Ei = np.where(fields["ok"], fields["E"][..., i], np.nan)
@@ -208,8 +225,8 @@ for i in range(3):
     if i == 2:
         hi = max(abs(lo), abs(hi)); lo = -hi
     ax[i].imshow(img, extent=(ex0, ex1, ey0, ey1))
-    m = ax[i].pcolormesh(Xd, Yd, Ei, cmap=D.diverging_cmap() if i == 2 else "viridis",
-                         vmin=lo, vmax=hi, alpha=.75, shading="auto")
+    m = ax[i].pcolormesh(Xe, Ye, Ei, cmap=D.diverging_cmap() if i == 2 else "viridis",
+                         vmin=lo, vmax=hi, shading="flat", edgecolors="face", linewidth=0.3)
     ax[i].plot(qz, qt, "r-o", ms=4, lw=1)
     # CellScale point numbers; corners TL, TR, BR, BL are points 1, 3, 4, 2, labeled outside the quad
     for c, (num, dz, dt, ha, va) in enumerate([(1, -0.25, 0.25, "right", "bottom"), (3, 0.25, 0.25, "left", "bottom"),

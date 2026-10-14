@@ -328,6 +328,7 @@ track_of() {
   done
   return 1
 }
+export -f track_of
 # all_tracked TEST: true when Def11-Def19 all have a full-domain track (needed by jfig, edge and compare)
 all_tracked() {
   [ "$DRY" = 1 ] && return 0

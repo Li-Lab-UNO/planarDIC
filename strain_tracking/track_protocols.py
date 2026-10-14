@@ -25,8 +25,8 @@ Grid (--grid):
     ../.venv/bin/python track_protocols.py --test N1690/test1 --defs Def11
     ../.venv/bin/python track_protocols.py --test N1739/test1 --loading-only
 
---loading-only stops each deformation at the end of loading (the logged Recover start + 2 s,
-dic2d.loading_end_time), about 55% of the frames. Tracking runs forward, so the loading frames are the
+--loading-only stops each deformation at the end of loading, the frame where the rakes peak
+(dic2d.loading_end_time; the fits end the loading branch there too), about half the frames. Tracking runs forward, so the loading frames are the
 same as in a full-cycle track; the unloading frames are left out (animations and CellScale comparisons
 then cover loading only). The npz records branch = "loading" or "full".
 Outputs: <test>/DIC_results/DefNN_*[_standard].npz
@@ -88,7 +88,7 @@ def run(T, defs=DEFAULT_DEFS, grid="tine_region", roi=None, step=None, radius=No
         times, paths = D.find_frames([os.path.join(T.images, fd)])
         n_all, branch = len(paths), "full"
         if loading_only:
-            keep = times <= D.loading_end_time(T.root, fd) + 1e-6
+            keep = times <= D.loading_end_time(T.root, fd) + 0.05      # through the rake-peak frame
             times, paths, branch = times[keep], [q for q, k in zip(paths, keep) if k], "loading"
         # bridge: reference frame -> this deformation's first frame
         img0, use0 = D.load_frame(paths[0], prm)
@@ -135,7 +135,7 @@ def main():
                     default=T.config.get("dic", {}).get("mask_saturated", False),
                     help="leave saturated glint pixels out of the matching (default: the test's dic.mask_saturated)")
     ap.add_argument("--loading-only", action="store_true",
-                    help="track each deformation to the end of loading only (Recover start + 2 s)")
+                    help="track each deformation to the end of loading only (the rake peak)")
     a = ap.parse_args()
     run(T, a.defs, a.grid, a.roi, a.step, a.radius, a.mask_saturated, loading_only=a.loading_only)
 

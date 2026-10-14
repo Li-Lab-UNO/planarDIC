@@ -70,16 +70,7 @@ def lam_from_F(F):
 
 
 TRACK_SUBDIR = {"tine_region": "", "standard": "standard_roi"}   # output subfolder of constitutive_fit/
-LOADING_SLACK_S = D.LOADING_SLACK_S   # s past the logged Recover start searched for the rake peak
-
-
-def loading_end(Dd, t0, t_recover, slack=LOADING_SLACK_S):
-    """End of the loading branch: the time the rakes peak (largest summed rake stretch), searched from
-    the Stretch start to `slack` s past the logged Recover start. The logged boundary can lag the motion:
-    in Def12 the rakes and forces keep rising until 864.5 s, 0.5 s after the logged 864.0 s."""
-    w = Dd.loc[t0 - 1e-6:t_recover + slack]
-    rake = w.X_Size_um / w.X_Size_um.iloc[0] + w.Y_Size_um / w.Y_Size_um.iloc[0]
-    return round(float(rake.idxmax()), 1)
+loading_end = D.rake_peak   # end of the loading branch: the rake peak (also where --loading-only tracking stops)
 
 
 def build_table(sets, tracks="tine_region"):
@@ -255,7 +246,7 @@ def main():
                     help="DIC tracks: standard ROI, or tine_region (grid out to the tine tips)")
     ap.add_argument("--table-only", action="store_true", help="write the stretch table, no fitting")
     ap.add_argument("--plot-only", action="store_true",
-                    help="redraw the fit plot from the saved stretch table and parameters, no fitting")
+                    help="redraw the parameter and fit plots from the saved stretch table and parameters, no fitting")
     ap.add_argument("--plot-input", nargs="+", choices=INPUTS + ["all"], default=["all"],
                     help="stretch inputs to draw a fit plot for (default: all, one plot each)")
     ap.add_argument("--out", default=None, help="default <test>/constitutive_fit[/standard_roi]")
@@ -270,7 +261,9 @@ def main():
 
     cache = os.path.join(a.out, "stretch_inputs_data.csv")
     if a.plot_only:
-        P, df = pd.read_csv(os.path.join(a.out, "params_by_stretch_input.csv")).set_index("input"), pd.read_csv(cache)
+        P, df = pd.read_csv(os.path.join(a.out, "params_by_stretch_input.csv")), pd.read_csv(cache)
+        params_plot(P, a.out)
+        P = P.set_index("input")
         lims = plot_limits(a, df)
         for inp in plot_inputs(a):
             print("wrote", fit_plot(a, df, inp, P.loc[inp, list(M.PARAM_NAMES)].to_numpy(float),
@@ -346,23 +339,31 @@ def main():
     fig.savefig(os.path.join(a.out, "stretch_inputs_histories.png"), dpi=90)
 
     # 2) parameters by input (elastin-active solution) with protocol-level bootstrap 95% intervals
-    fig, ax = plt.subplots(2, 4, figsize=(17, 8.5), constrained_layout=True)
-    for i, (n, u) in enumerate(zip(M.PARAM_NAMES, M.PARAM_UNITS)):
-        a_ = ax.ravel()[i]
-        for j, inp in enumerate(INPUTS):
-            r = results[inp]
-            a_.plot([j, j], [r["lo"][i], r["hi"][i]], color=cols[inp], lw=2, alpha=.4)
-            a_.plot(j, r["best"][i], "o", ms=7, color=cols[inp])
-        a_.set_xticks(range(len(INPUTS))); a_.set_xticklabels([LABELS[k] for k in INPUTS], rotation=60, ha="right", fontsize=8)
-        a_.set_title(f"{n} ({u})"); a_.grid(alpha=.3)
-    fig.suptitle("Fitted parameters by stretch input, elastin-active solution "
-                 "(dots: best fit; bars: protocol-level bootstrap 95%)")
-    fig.savefig(os.path.join(a.out, "params_by_stretch_input.png"), dpi=90)
+    params_plot(T, a.out)
 
     lims = plot_limits(a, df)
     for inp in plot_inputs(a):
         fit_plot(a, df, inp, results[inp]["best"], results[inp]["R2"], results[inp]["rms"], lims)
     print("\nwrote", a.out)
+
+
+def params_plot(T, out):
+    """params_by_stretch_input.png from the parameter table T (params_by_stretch_input.csv): best fit and
+    protocol-level bootstrap 95% interval of every parameter, for each stretch input."""
+    T = T.set_index("input")
+    cols = {k: plt.get_cmap("tab10")(i) for i, k in enumerate(INPUTS)}
+    fig, ax = plt.subplots(2, 4, figsize=(17, 8.5), constrained_layout=True)
+    for i, (n, u) in enumerate(zip(M.PARAM_NAMES, M.PARAM_UNITS)):
+        a_ = ax.ravel()[i]
+        for j, inp in enumerate(INPUTS):
+            a_.plot([j, j], [T.loc[inp, n + "_lo95"], T.loc[inp, n + "_hi95"]], color=cols[inp], lw=2, alpha=.4)
+            a_.plot(j, T.loc[inp, n], "o", ms=7, color=cols[inp])
+        a_.set_xticks(range(len(INPUTS))); a_.set_xticklabels([LABELS[k] for k in INPUTS], rotation=60, ha="right", fontsize=8)
+        a_.set_title(f"{n} ({u})"); a_.grid(alpha=.3)
+    fig.suptitle("Fitted parameters by stretch input, elastin-active solution "
+                 "(dots: best fit; bars: protocol-level bootstrap 95%)")
+    fig.savefig(os.path.join(out, "params_by_stretch_input.png"), dpi=90)
+    plt.close(fig)
 
 
 def plot_inputs(a):

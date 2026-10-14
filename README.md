@@ -153,8 +153,8 @@ the DIC noise, but are not bit-identical). Tracking takes most of the time: with
 a test running at once, a 380-frame deformation takes about 7 min on an M4 Mac (10 cores) and about
 4 min on a Threadripper 7970X (32 cores), so a whole test takes about as long as its longest deformation.
 
-`--loading-only` tracks each deformation only to the end of loading (the logged Recover start + 2 s),
-about 55% of the frames. The fits use only the loading branch, and tracking runs forward, so the
+`--loading-only` tracks each deformation only to the end of loading (the frame where the rakes peak),
+about half the frames. The fits use only the loading branch, and tracking runs forward, so the
 loading frames come out the same as in a full-cycle track. Animations and CellScale comparisons then
 cover loading only, and the unloading branch (closure back toward the rest state) is not tracked. The
 track records `branch`, and `strain_tracking/status.py` marks loading-only tracks.

@@ -326,15 +326,26 @@ def settings_label(R, mm_per_px, window_label):
     return f"{subset}, {window_label.replace(' Gaussian', '')} strain window"
 
 
-LOADING_SLACK_S = 2.0   # s past the logged Recover start: the logged boundary can lag the rake motion
+LOADING_SLACK_S = 2.0   # s past the logged Recover start searched for the rake peak (the log can lag the motion)
+
+
+def rake_peak(Dd, t0, t_recover, slack=LOADING_SLACK_S):
+    """End of the loading branch: the time (s) the rakes peak (largest summed rake stretch X/X0 + Y/Y0 in the
+    CellScale *Data.csv table Dd, indexed by Time_S), searched from the Stretch start t0 to `slack` s past the
+    logged Recover start. The logged boundary can lag the motion: in N1739 test1 Def12 the rakes and forces keep
+    rising until 864.5 s, 0.5 s after the logged 864.0 s."""
+    w = Dd.loc[t0 - 1e-6:t_recover + slack]
+    rake = w.X_Size_um / w.X_Size_um.iloc[0] + w.Y_Size_um / w.Y_Size_um.iloc[0]
+    return round(float(rake.idxmax()), 1)
 
 
 def loading_end_time(test_root, folder, slack=LOADING_SLACK_S):
-    """Time (s) up to which deformation `folder` (DefNN_...) is loading: the logged Recover start of its
-    cycle plus `slack`. DefNN is the NN-th Stretch phase of Logs/*_PhaseTiming.csv (sort_images.py); the
-    rake peak that ends the loading branch for the fits lies in this window (compare_stretch_inputs.loading_end)."""
+    """Time (s) the loading branch of deformation `folder` (DefNN_...) ends: its rake peak (rake_peak), the same
+    frame the fits end the loading branch at. DefNN is the NN-th Stretch phase of Logs/*_PhaseTiming.csv
+    (sort_images.py)."""
     import csv
     import glob
+    import pandas as pd
     m = re.match(r"(?i)def(\d+)", os.path.basename(str(folder)))
     logs = sorted(glob.glob(os.path.join(test_root, "Logs", "*PhaseTiming.csv")))
     if not m or not logs:
@@ -345,7 +356,11 @@ def loading_end_time(test_root, folder, slack=LOADING_SLACK_S):
     rec = [r for r in rows if r["Phase"] == "Recover" and r["Set"] == st["Set"] and r["Cycle"] == st["Cycle"]]
     if not rec:
         raise ValueError(f"no Recover phase for {folder} (Set {st['Set']}, cycle {st['Cycle']})")
-    return float(rec[0]["StartTime(s)"]) + slack
+    data = sorted(glob.glob(os.path.join(test_root, "*Data.csv")))
+    if not data:
+        raise ValueError(f"no *Data.csv in {test_root}")
+    Dd = pd.read_csv(data[0], encoding="latin1").drop_duplicates("Time_S").set_index("Time_S")
+    return rake_peak(Dd, round(float(st["StartTime(s)"]), 1), round(float(rec[0]["StartTime(s)"]), 1), slack)
 
 
 def programmed_stretch(test_root, folder):
