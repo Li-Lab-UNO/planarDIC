@@ -14,8 +14,8 @@ so the width is their mean:
     w_theta (divides F_z)     = mean(left, right)
     w_z     (divides F_theta) = mean(top, bottom)
 
-    ../.venv/bin/python measure_tines.py --test N1739/test2            print
-    ../.venv/bin/python measure_tines.py --test N1739/test2 --write    also update test_config.json
+    .venv/bin/python strain_tracking/measure_tines.py --test N1739/test2            print
+    .venv/bin/python strain_tracking/measure_tines.py --test N1739/test2 --write    also update test_config.json
 --write sets widths_mm.tine_span and widths_mm.tine_span_by_rake (needs scale_calibration.json).
 """
 import argparse

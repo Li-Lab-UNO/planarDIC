@@ -27,7 +27,7 @@ Recovery: node positions (FE solution inside the inset, smoothed tracks on the o
 Patterns: 'uniform' (alpha = 1 everywhere: the null test; its recovered RMS error is the detection floor for
 patch contrasts) and 'stage1' (interior alpha from Stage 1, outer ring alpha = 1).
 
-    ../.venv/bin/python stage2_synthetic.py --test N1739/test1 [--every 8] [--modes 8] [--win 1] [--noise 0 0.03 0.1]
+    .venv/bin/python constitutive_fit/stage2_synthetic.py --test N1739/test1 [--every 8] [--modes 8] [--win 1] [--noise 0 0.03 0.1]
 Outputs: <test>/constitutive_fit/local/stage2_synthetic/ (FE solutions are cached as fe_<pattern>.npz)
 """
 import argparse

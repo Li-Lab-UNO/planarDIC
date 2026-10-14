@@ -31,7 +31,7 @@ consistent stopping value, so the choice is left to the user.
 Image axes: the segmentation is invariant to the sign of theta. Plots use theta increasing upward,
 measured from the bottom tine tips.
 
-    ../.venv/bin/python segment_fjump.py --test N1739/test1 [--max-parts 10] [--frames 5] [--unscaled] [--uniform-jump]
+    .venv/bin/python constitutive_fit/segment_fjump.py --test N1739/test1 [--max-parts 10] [--frames 5] [--unscaled] [--uniform-jump]
 Outputs: <test>/constitutive_fit/local/segmentation/
     segmentation.npz      element geometry, summed and per-protocol jumps, labels for every partition
     segmentation.json     partitions (sizes, modularity, removal step) and settings

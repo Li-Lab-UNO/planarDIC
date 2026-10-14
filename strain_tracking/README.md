@@ -6,7 +6,7 @@ Incremental 2D subset DIC (IC-GN, affine subsets, ZNSSD, per-point reference upd
 
 Every script needs a test: `--test SAMPLE/testN` (e.g. `--test N1739/test2`), or the test that a given `.npz` is in (see the
 top-level `README.md`). Test-specific settings come from that test's `test_config.json`.
-`../runDIC.sh` runs the scripts below in order for one or more tests.
+`./runDIC.sh` (in the project folder) runs the scripts below in order for one or more tests.
 The constitutive fits are in `../constitutive_fit/`.
 
 ## Axes and naming
@@ -84,19 +84,19 @@ common-reference track; use `track_protocols.py` for Def11–Def19.
 ## Usage
 
 ```bash
-../.venv/bin/python track.py --test N1739/test1 --def Def01 --tag test
+.venv/bin/python strain_tracking/track.py --test N1739/test1 --def Def01 --tag test
 ```
 
 ```bash
-../.venv/bin/python compare_cellscale.py ../N1739_LFPA/test1_08252026_PLC25_38-20/DIC_results/Def11_Equibiaxial.npz
+.venv/bin/python strain_tracking/compare_cellscale.py N1739_LFPA/test1_08252026_PLC25_38-20/DIC_results/Def11_Equibiaxial.npz
 ```
 
 ```bash
-../.venv/bin/python export_fields.py ../N1739_LFPA/test1_08252026_PLC25_38-20/DIC_results/Def11_Equibiaxial.npz
+.venv/bin/python strain_tracking/export_fields.py N1739_LFPA/test1_08252026_PLC25_38-20/DIC_results/Def11_Equibiaxial.npz
 ```
 
 ```bash
-../.venv/bin/python animate_fields.py ../N1739_LFPA/test1_08252026_PLC25_38-20/DIC_results/Def11_Equibiaxial.npz
+.venv/bin/python strain_tracking/animate_fields.py N1739_LFPA/test1_08252026_PLC25_38-20/DIC_results/Def11_Equibiaxial.npz
 ```
 
 - **`--def`** accepts `Def13`, `Def1` (= Def01) or any unique folder prefix.

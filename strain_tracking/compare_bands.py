@@ -16,7 +16,7 @@ Band measures, per test (valid field points only):
 Band positions are not comparable between specimens unless they were mounted in the same
 orientation; amplitude, direction and spacing are.
 
-    ../.venv/bin/python compare_bands.py --sample N1739 --tests test1 test2 test3 --def Def11
+    .venv/bin/python strain_tracking/compare_bands.py --sample N1739 --tests test1 test2 test3 --def Def11
 Outputs: comparisons/bands_<Def>_<tests>.png / .csv
 """
 import argparse

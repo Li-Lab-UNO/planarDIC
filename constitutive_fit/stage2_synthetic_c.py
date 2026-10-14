@@ -15,7 +15,7 @@ True cases (C1 constants uniform, alpha = 1):
 The single-factor truth from stage2_synthetic.py (alpha = Stage 1 pattern, fe_stage1.npz) is scored the same way
 as the reference.
 
-    ../.venv/bin/python stage2_synthetic_c.py --test N1739/test1 [--noise 0 0.03]
+    .venv/bin/python constitutive_fit/stage2_synthetic_c.py --test N1739/test1 [--noise 0 0.03]
 Outputs: <test>/constitutive_fit/local/stage2_synthetic/ (fe_exp_*.npz, stage2_synthetic_c.*)
 """
 import argparse

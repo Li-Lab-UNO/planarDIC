@@ -10,10 +10,10 @@ freeze   Copy the current compare_stretch_inputs.py results into
 evaluate Score any parameter set on the frozen data set with the same stress definition:
          overall R^2 / RMS and per-protocol RMS, side by side with the baseline.
 
-    ../.venv/bin/python baseline.py --test N1739/test1 freeze
-    ../.venv/bin/python baseline.py --test N1739/test1 freeze --tracks standard     (standard_roi/baseline/)
-    ../.venv/bin/python baseline.py --test N1739/test1 evaluate --params "5.9,3.6,1.8,9.4,9.9,1.8,7.2,49"
-    ../.venv/bin/python baseline.py --test N1739/test1 evaluate --params-json my_fit.json --input dic_affine
+    .venv/bin/python constitutive_fit/baseline.py --test N1739/test1 freeze
+    .venv/bin/python constitutive_fit/baseline.py --test N1739/test1 freeze --tracks standard     (standard_roi/baseline/)
+    .venv/bin/python constitutive_fit/baseline.py --test N1739/test1 evaluate --params "5.9,3.6,1.8,9.4,9.9,1.8,7.2,49"
+    .venv/bin/python constitutive_fit/baseline.py --test N1739/test1 evaluate --params-json my_fit.json --input dic_affine
 
 In Python:  import testcfg; testcfg.select("N1739/test1"); import baseline; baseline.evaluate([...])  -> dict
             baseline.load(tracks="tine_region") / evaluate(..., tracks="tine_region") for the

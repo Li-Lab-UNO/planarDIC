@@ -45,13 +45,14 @@ analyzed; Def01–Def10 are preconditioning.
 Every script works on one test. Select it with `--test SAMPLE/TEST`, where each part is any
 unique prefix of the folder name, or with the environment variable `DIC_TEST`:
 
+Commands are run from the project folder:
+
 ```bash
-cd strain_tracking
-../.venv/bin/python track_protocols.py --test N1739/test2
+.venv/bin/python strain_tracking/track_protocols.py --test N1739/test2
 ```
 
 ```bash
-DIC_TEST=N1739/test1 ../.venv/bin/python ../constitutive_fit/baseline.py evaluate --params "…"
+DIC_TEST=N1739/test1 .venv/bin/python constitutive_fit/baseline.py evaluate --params "…"
 ```
 
 `--test N1739/test2` selects `N1739_LFPA/test2_…`. A bare test name (`--test test2`) works only
@@ -164,7 +165,8 @@ track records `branch`, and `strain_tracking/status.py` marks loading-only track
 `NEW_TEST_UBUNTU.md` walks through these steps command by command.
 
 1. **Copy the CellScale output** into `<SAMPLE>/test<N>_…/`: `*Data.csv`, `Coords1.csv`, the `.tst` file,
-   `Logs/` (with `*_PhaseTiming.csv`) and the images in `Images/`.
+   `Logs/` (with `*_PhaseTiming.csv`) and the images in `Images/`; and the thickness photos into
+   `<SAMPLE>/Thickness, <ID>/test <N>/`.
 2. **Sort the images:** `sort_images.py --test SAMPLE/testN --dry-run`, then without `--dry-run`.
 3. **Draft `test_config.json`:** `make_config.py --test SAMPLE/testN --label "labeled healthy"` finds the
    20 tine tips in the Def11 rest frame, refines them with the calibration's tip finder and writes the
@@ -174,17 +176,25 @@ track records `branch`, and `strain_tracking/status.py` marks loading-only track
 4. **Calibrate the scale:** `calibrate_scale.py --test SAMPLE/testN` (Def01 and Def19). Tine pairs that
    disagree with the rest are left out by its outlier rule and listed; check `scale_calibration.png`.
    `calibration_exclude` in the config overrides the rule.
-5. **Measure the tine spans:** `measure_tines.py --test SAMPLE/testN --write`.
-6. **Track:** `track_protocols.py --test SAMPLE/testN` (Def11–Def19), then `artifact_check.py --test
-   SAMPLE/testN`: if it adds an excluded region (exit status 3), track the test again.
-7. **Figures and exports:** `peak_j_figure.py --test SAMPLE/testN`, then `compare_cellscale.py`,
+5. **Measure the tine spans:** `measure_tines.py --test SAMPLE/testN --write` → `widths_mm`.
+6. **Thickness:** `measure_thickness.py --recursive --write "<SAMPLE>/Thickness, <ID>"` measures the photos
+   and writes each test's thickness, in place of the workbook value `make_config.py` entered
+   (`--keep-workbook`: workbook values stay, the photos fill only tests without one). Check its overlays.
+7. **Track:** `track_protocols.py --test SAMPLE/testN` (Def11–Def19; `--loading-only` for the loading
+   branches only, which is all the fits use), then `artifact_check.py --test SAMPLE/testN`: if it adds an
+   excluded region (exit status 3), track the test again.
+8. **Figures and exports:** `peak_j_figure.py --test SAMPLE/testN`, then `compare_cellscale.py`,
    `export_fields.py` and `animate_fields.py` on a track `.npz`.
-8. **Thickness** (for stress and fitting only): `measure_thickness.py --recursive --write "<SAMPLE>/Thickness, <ID>"`
-   measures the photos and writes each test's thickness, in place of the workbook value `make_config.py`
-   entered (`--keep-workbook`: workbook values stay, the photos fill only tests without one). Check its overlays.
+9. **Stresses and the constitutive fit:**
+   `.venv/bin/python constitutive_fit/compare_stretch_inputs.py --test SAMPLE/testN`. The Cauchy stresses
+   come from the tared rake forces, the stretches, the tine spans and the thickness:
+   t_zz = F_z·lambda_z / (w_theta·H) and t_thetatheta = F_theta·lambda_theta / (w_z·H), over the loading
+   branch of Def11–Def19 (Stretch start to the rake peak). The four-fiber model is fitted for each stretch
+   input, with a protocol-level bootstrap → `<test>/constitutive_fit/` (parameters, `fit_stress_stretch_<input>.png`).
+   See `constitutive_fit/README.md`.
 
-Steps 2–8 are what `runDIC.sh` runs (the thickness as its `thickness` step). Constitutive fitting is separate: see
-`constitutive_fit/README.md`.
+Steps 2–8 are what `runDIC.sh` runs, in this order; step 9 is run on its own, one test at a time (the
+three tests of a sample can run at once, about 0.5–2 min each).
 
 ## Thickness from photos: `thickness/measure_thickness.py`
 
@@ -230,7 +240,7 @@ joins pieces of one strip whose gap is tissue-colored all along (a faint middle 
 and never joins far-apart parts of a strip (the ends of a C stay apart). Isolated small pieces such
 as printed numerals stay out. Blurred photos still give a less certain edge: check their overlays.
 
-`thickness/compare_manual.py` compares the center strips with the workbooks' manual readings
+`thickness/compare_manual.py` compares the selected strips with the workbooks' manual readings
 (same two images per test) and writes `comparisons/thickness_auto_vs_manual*.csv` and `.png`.
 
 ## Environment

@@ -31,7 +31,7 @@ Checks:
   * consistency: residuals of each block at alpha = 1 (bulk) and at the Stage 1 interior alpha map,
     relative to the size of the terms. Evaluations only; nothing is fitted.
 
-    ../.venv/bin/python stage2_setup.py --test N1739/test1 [--exclude-ring 1] [--every 4] [--modes 8] [--win 1]
+    .venv/bin/python constitutive_fit/stage2_setup.py --test N1739/test1 [--exclude-ring 1] [--every 4] [--modes 8] [--win 1]
 Outputs: <test>/constitutive_fit/local/stage2_setup/
 """
 import argparse

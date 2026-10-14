@@ -31,8 +31,8 @@ replaces only the keys written here and keeps the rest, and a rake that fails th
 its existing tines. Finally every tip is refined with calibrate_scale.find_tip (the tip finder the scale
 calibration applies frame by frame) and tine_tips_px is the median of the refined tips per rake.
 
-    ../.venv/bin/python make_config.py --test N1757/test1 --label "labeled healthy"
-    ../.venv/bin/python make_config.py --test N1739/test1 --out /tmp/check.json       (compare, no overwrite)
+    .venv/bin/python strain_tracking/make_config.py --test N1757/test1 --label "labeled healthy"
+    .venv/bin/python strain_tracking/make_config.py --test N1739/test1 --out /tmp/check.json       (compare, no overwrite)
 Output: <test>/test_config.json (or --out) and <test>/DIC_results/config_tine_tips.png
 """
 import argparse

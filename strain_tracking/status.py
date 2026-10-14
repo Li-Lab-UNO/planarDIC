@@ -1,9 +1,9 @@
 """
 Status of every test folder: what has been set up, tracked and exported, read from the files on disk.
 
-    ../.venv/bin/python status.py                 every sample
-    ../.venv/bin/python status.py N1739 N1757     some samples (folder prefixes)
-    ../.venv/bin/python status.py --notes         also print each test's notes from test_config.json
+    .venv/bin/python strain_tracking/status.py                 every sample
+    .venv/bin/python strain_tracking/status.py N1739 N1757     some samples (folder prefixes)
+    .venv/bin/python strain_tracking/status.py --notes         also print each test's notes from test_config.json
 
 Columns: sorted (DefNN folders), config (test_config.json), scale (px/mm; excluded tine pairs),
 widths (w_theta / w_z tine spans, mm), H (thickness, mm, from the photos or the workbook), tracked (deformations with a full-domain

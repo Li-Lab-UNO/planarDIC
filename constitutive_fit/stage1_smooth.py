@@ -21,8 +21,8 @@ Uncertainty at the chosen lam: protocol-level bootstrap.
 --exclude-ring N leaves the outer N rings of patches (next to the tine tips) out of the fit and the
 penalty entirely, so their extreme values cannot pull their neighbors.
 
-    ../.venv/bin/python stage1_smooth.py --test N1739/test1                    -> local/stage1_smooth/
-    ../.venv/bin/python stage1_smooth.py --test N1739/test1 --exclude-ring 1   -> local/stage1_smooth_interior1/
+    .venv/bin/python constitutive_fit/stage1_smooth.py --test N1739/test1                    -> local/stage1_smooth/
+    .venv/bin/python constitutive_fit/stage1_smooth.py --test N1739/test1 --exclude-ring 1   -> local/stage1_smooth_interior1/
 Outputs: stage1_smooth.csv / .npz / .json and stage1_smooth.png
 """
 import argparse

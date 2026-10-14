@@ -7,7 +7,8 @@ status and its findings.
 
 Every script needs a test (`--test SAMPLE/testN`, e.g. `--test N1739/test1`, or `DIC_TEST`; see the top-level `README.md`).
 The thickness and widths default to that test's `test_config.json`. The scripts import
-`dic2d` and `testcfg` from `../strain_tracking/`, and they read the tracks in `<test>/DIC_results/`.
+`dic2d` and `testcfg` from `strain_tracking/`, and they read the tracks in `<test>/DIC_results/`. Commands are
+run from the project folder.
 
 ## Outputs, per test (`<test>/constitutive_fit/`)
 
@@ -52,17 +53,31 @@ constitutive_fit/
 
 ## Usage
 
+Fit one test (every stretch input, bootstrap, plots → `<test>/constitutive_fit/`):
+
 ```bash
-../.venv/bin/python compare_stretch_inputs.py --test N1739/test1 --tracks tine_region --table-only
+.venv/bin/python constitutive_fit/compare_stretch_inputs.py --test N1739/test1
+```
+
+Redraw the parameter and fit plots from the saved results, without fitting:
+
+```bash
+.venv/bin/python constitutive_fit/compare_stretch_inputs.py --test N1739/test1 --plot-only
+```
+
+Freeze the result as the test's baseline, then score another parameter set against it:
+
+```bash
+.venv/bin/python constitutive_fit/baseline.py --test N1739/test1 freeze
 ```
 
 ```bash
-../.venv/bin/python baseline.py --test N1739/test1 evaluate --params "6.24,3.61,1.88,10.1,10.7,1.31,7.75,47.7"
+.venv/bin/python constitutive_fit/baseline.py --test N1739/test1 evaluate --params "5.71,4.07,1.69,9.88,10.5,0.991,7.93,45.6"
 ```
 
 ```python
-import sys; sys.path[:0] = ["../strain_tracking", "."]
+import sys; sys.path[:0] = ["strain_tracking", "constitutive_fit"]
 import testcfg; testcfg.select("N1739/test1")
 import baseline
-baseline.evaluate([...], tracks="tine_region")
+baseline.evaluate([...])
 ```

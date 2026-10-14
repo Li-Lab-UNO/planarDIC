@@ -12,8 +12,8 @@ tips follow the rakes. Checks:
   * low-force vs full range (tine bending under load would bend the curve)
   * loading vs unloading (backlash / lag)
 
-    ../.venv/bin/python calibrate_scale.py --test N1739/test1 --def Def01
-    ../.venv/bin/python calibrate_scale.py --test N1739/test1 --def Def01 Def19
+    .venv/bin/python strain_tracking/calibrate_scale.py --test N1739/test1 --def Def01
+    .venv/bin/python strain_tracking/calibrate_scale.py --test N1739/test1 --def Def01 Def19
 
 Tine pairs that disagree with the rest are left out by an outlier rule (outliers(): more than 6% from the
 median of all pairs, or Def01 and Def19 more than 5% apart, or not tracked throughout), and listed in

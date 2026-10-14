@@ -7,8 +7,8 @@ Folders are named DefNN_<SetName>[_cNN] inside Images/. Any jpgs already in
 Images/ subfolders are found and moved too, so re-running is safe.
 A manifest (old path -> new path) is written to Images/sort_manifest.csv.
 
-    ../.venv/bin/python sort_images.py --test N1739/test2 --dry-run
-    ../.venv/bin/python sort_images.py --test N1739/test2
+    .venv/bin/python strain_tracking/sort_images.py --test N1739/test2 --dry-run
+    .venv/bin/python strain_tracking/sort_images.py --test N1739/test2
 """
 import argparse
 import csv

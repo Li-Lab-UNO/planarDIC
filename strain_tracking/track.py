@@ -6,11 +6,11 @@ The grid defaults to the full domain between the tine tips (--grid tine_region, 
 An existing common-reference track (from track_protocols.py) is never overwritten.
 
 Track a whole deformation folder; results go to <test>/DIC_results/:
-    ../.venv/bin/python track.py --test N1739/test1 --def Def01
-    ../.venv/bin/python track.py --test N1739/test1 --def Def13 --radius 40 --step 20 --tag s81_g20
+    .venv/bin/python strain_tracking/track.py --test N1739/test1 --def Def01
+    .venv/bin/python strain_tracking/track.py --test N1739/test1 --def Def13 --radius 40 --step 20 --tag s81_g20
 
 Or an arbitrary time window across all of Images/ (saved in DIC_results/ as t<t0>-<t1>...npz):
-    ../.venv/bin/python track.py --test N1739/test1 --t0 893 --t1 913
+    .venv/bin/python strain_tracking/track.py --test N1739/test1 --t0 893 --t1 913
 """
 import argparse
 import os

@@ -9,7 +9,7 @@ fields, rows scaled to unit norm at eps = 1, blocks equal weight) plus neighbor 
 sqrt(lam_e) D s. lam_a is the ladder (a) value from stage2_fit.json; lam_e by leave-one-protocol-out CV.
 Solved with scipy least_squares (trust region, eps bounded to the level grid), started from ladder (a).
 
-    ../.venv/bin/python stage2_exponent_fit.py --test N1739/test1 [--exps fiber|all] [--synthetic fib40]
+    .venv/bin/python constitutive_fit/stage2_exponent_fit.py --test N1739/test1 [--exps fiber|all] [--synthetic fib40]
 --synthetic NAME fits the FE data from stage2_synthetic_c.py (fe_exp_NAME.npz) instead, as a recovery check.
 Outputs: <test>/constitutive_fit/local/stage2_exponent/ (stage2_exponent_<tag>.json/.npz/.png)
 """

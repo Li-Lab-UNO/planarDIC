@@ -15,7 +15,7 @@ Fit: multi-start least squares for the global minimum, then nonparametric bootst
 (resample frames, refit) as in Jadidi et al. 2019. Also a gamma profile and the
 linearized parameter correlations.
 
-    ../.venv/bin/python fit_4pt.py --test N1739/test1 --sets 2-10
+    .venv/bin/python constitutive_fit/fit_4pt.py --test N1739/test1 --sets 2-10
 Thickness and widths default to the test's test_config.json.
 Outputs: <test>/constitutive_fit/
 """

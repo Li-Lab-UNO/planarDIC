@@ -1,11 +1,11 @@
 # Running tests on Ubuntu, from scratch
 
-Every command below is run from the project folder (the git clone, `~/Documents/DIC` here) in Ubuntu's
+Every command below is run from the project folder (the git clone, `~/Documents/planarDIC` here) in Ubuntu's
 Terminal.
 
 The examples use a sample **N1900_LFPA** and its **test1**; replace them with your own names.
-`./runDIC.sh` runs steps 3–6 in one command; the steps are listed separately so a single one
-can be rerun. Its defaults on this computer (tests, jobs, steps, ...) are in `runDIC.ubuntu.ini`.
+`./runDIC.sh` runs steps 3–7 in one command; the steps are listed separately so a single one
+can be rerun. The constitutive fit (step 8) is run on its own. Its defaults on this computer (tests, jobs, steps, ...) are in `runDIC.ubuntu.ini`.
 
 ---
 
@@ -21,7 +21,7 @@ sudo apt install git gh python3-venv
 gh auth login
 ```
 ```bash
-gh repo clone davidshuenli/planarDIC ~/Documents/DIC
+gh repo clone davidshuenli/planarDIC ~/Documents/planarDIC
 ```
 
 Then copy each sample folder into the project folder, in any way that suits,
@@ -50,7 +50,7 @@ Make a sample folder next to the existing ones, and a test folder inside it. **T
 start with `test` + a number + `_`** (for example `test1_10142026_PLC25_40-12`), or the code won't find it.
 
 ```
-DIC/ (the project folder)
+planarDIC/ (the project folder)
 └── N1900_LFPA/
     ├── Thickness, 1900/             thickness photos in test 1/, test 2/, … (and workbook, if any)
     └── test1_10142026_PLC25_40-12/
@@ -123,7 +123,24 @@ percent (right panel). To choose the pairs yourself, add them to the config, for
 
 ---
 
-## 5. Track Def11–Def19
+## 5. Thickness
+
+The pipeline's `thickness` step measures the photos in `Thickness, 1900/test <N>` and writes `thickness_mm`
+into each test's config, in place of the workbook value (`thickness = auto` in `runDIC.ubuntu.ini`), or
+only where the workbook gives none (`thickness = workbook`, or `--thickness workbook` for one run). Its log
+lists the photos used and those left out, with the reason. To run it on its own:
+
+```bash
+./runDIC.sh --steps thickness N1900
+```
+
+Check the overlays in `Thickness, 1900/thickness_auto/test<N>/`: the yellow outline should follow the tissue
+around every strip, and every strip marked `*` (all, by default) should be a piece of the test's specimen
+(`strip_selection.json` in the photo folder can use one strip of a photo, or leave a photo out). See "Thickness from photos" in `README.md`.
+
+---
+
+## 6. Track Def11–Def19
 
 ```bash
 ./runDIC.sh --steps track,artifacts N1900/test1
@@ -132,7 +149,9 @@ percent (right panel). To choose the pairs yourself, add them to the config, for
 This is the long step: one job per deformation, `jobs` of them at a time (`runDIC.ubuntu.ini`;
 `--jobs N` for one run), each matching on several threads. With all nine deformations of a test running
 at once, a 380-frame deformation takes about 4 min on the Threadripper (about 7 min on the M4 Mac). If
-you're connected over SSH, run it inside `tmux` so it keeps going if the connection drops. Each
+you're connected over SSH, run it inside `tmux` so it keeps going if the connection drops. The fits use
+only the loading branches: `--loading-only` (or `loading_only = yes` in `runDIC.ubuntu.ini`) stops each
+deformation at the rake peak and tracks about half the frames. Each
 deformation's track goes to the test's `DIC_results/` folder as `DefNN_….npz`.
 
 **artifacts** then looks for local tracking errors, such as a speckle particle sliding over the tissue or
@@ -141,7 +160,7 @@ a glare patch whose edges shift with load. When it confirms one, it excludes tha
 
 ---
 
-## 6. Figures and exports
+## 7. Figures and exports
 
 ```bash
 ./runDIC.sh --steps jfig,exports,edge,compare N1900
@@ -155,35 +174,37 @@ a glare patch whose edges shift with load. When it confirms one, it excludes tha
 
 ---
 
-## Everything at once
+## 8. Stresses and the constitutive fit
+
+`runDIC.sh` stops before fitting. Fit each test on its own (the tests of a sample can run at once, in
+separate terminals; about 0.5–2 min each):
+
+```bash
+.venv/bin/python constitutive_fit/compare_stretch_inputs.py --test N1900/test1
+```
+
+The Cauchy stresses come from the tared rake forces, the stretches, the tine spans (`widths_mm`) and the
+thickness (`thickness_mm`): t_zz = F_z·lambda_z / (w_theta·H) and t_thetatheta = F_theta·lambda_theta / (w_z·H),
+over the loading branch of Def11–Def19. The four-fiber model is fitted for each stretch input (CellScale
+4-point, DIC 4-point, DIC region mean, DIC affine F, DIC region edges, rake), with a protocol-level
+bootstrap. Results go to the test's `constitutive_fit/`: `params_by_stretch_input.csv / .png` (parameters
+and 95% intervals) and `fit_stress_stretch_<input>.png` (data and model, every protocol on one plot). See
+`constitutive_fit/README.md`.
+
+---
+
+## Everything at once (steps 3–7)
 
 ```bash
 ./runDIC.sh --label "labeled healthy" N1900
 ```
 
 It asks before starting (`--yes` skips the question), writes logs to `DIC_logs/run_<date>_<time>/`
-in each test folder, and ends with a summary. Check `config_tine_tips.png` and `scale_calibration.png` afterwards.
+in each test folder, and ends with a summary. Check `config_tine_tips.png`, `scale_calibration.png` and the
+thickness overlays afterwards, then fit each test (step 8).
 
 To see what each test has:
 
 ```bash
 .venv/bin/python strain_tracking/status.py --notes
 ```
-
----
-
-## Thickness (needed only for stress and fitting)
-
-The pipeline's `thickness` step measures the photos in `Thickness, 1900/test <N>` and writes `thickness_mm`
-into each test's config, in place of the workbook value (`thickness = auto` in `runDIC.ubuntu.ini`), or
-only where the workbook gives none (`thickness = workbook`, or `--thickness workbook` for one run). Its log
-lists the photos used and those left out, with the reason. To run it on its own:
-
-```bash
-./runDIC.sh --steps thickness N1900
-```
-
-Check the overlays in `Thickness, 1900/thickness_auto/test<N>/`: the yellow outline should follow the tissue
-around every strip, and every strip marked `*` (all, by default) should be a piece of the test's specimen
-(`strip_selection.json` in the photo folder can use one strip of a photo, or leave a photo out). See "Thickness from photos" in `README.md`. Constitutive fitting is separate: see
-`constitutive_fit/README.md`.

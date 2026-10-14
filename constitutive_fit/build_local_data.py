@@ -20,7 +20,7 @@ Axes: theta increases upward in the image (dic2d.THETA_SIGN). Stored grids are [
 [theta, z] with row 0 at the bottom tine tips and col 0 at the left tine tips; F is in the
 specimen frame (dic2d.to_specimen).
 
-    ../.venv/bin/python build_local_data.py --test N1739/test1
+    .venv/bin/python constitutive_fit/build_local_data.py --test N1739/test1
 Outputs: <test>/constitutive_fit/local/
     local_data.npz          F per frame on the grid, masks, tared forces, zones, checksums
     patches.json            patch edges (mm from the left / bottom tips), coverage, strain concentrations

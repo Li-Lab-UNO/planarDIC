@@ -16,8 +16,8 @@ marker for the current frame. Outputs go next to the .npz as
 Axes: image x = axial (z); circumferential theta increases upward (theta = -image y).
 Maps are drawn on the photo, so the picture keeps its image orientation.
 
-    ../.venv/bin/python animate_fields.py ../N1739_LFPA/test1_08252026_PLC25_38-20/DIC_results/Def11_Equibiaxial.npz
-    ../.venv/bin/python animate_fields.py <npz> --quantity stretch strain --fps 30
+    .venv/bin/python strain_tracking/animate_fields.py N1739_LFPA/test1_08252026_PLC25_38-20/DIC_results/Def11_Equibiaxial.npz
+    .venv/bin/python strain_tracking/animate_fields.py <npz> --quantity stretch strain --fps 30
 """
 import argparse
 import glob

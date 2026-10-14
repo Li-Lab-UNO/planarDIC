@@ -15,7 +15,7 @@ T4  Independent tracker: cv2.matchTemplate from frame 0 straight to the peak fra
 Runs on Def01 of the selected test: reference = its first frame, peak = the frame at the rake
 peak; grid = the test's roi_px.standard.
 
-    ../.venv/bin/python validate_bands.py --test N1739/test1   (needs Def01 tracked first: track.py --def Def01)
+    .venv/bin/python strain_tracking/validate_bands.py --test N1739/test1   (needs Def01 tracked first: track.py --def Def01)
 """
 import os
 import sys

@@ -9,7 +9,7 @@ their rest positions. Right: change in tip separation vs the tester's reported c
 separation, with the calibration result as a line (its slope is px per mm), and the residual
 from that line vs rake force.
 
-    ../.venv/bin/python animate_calibration.py --test N1690/test2 --def Def01 --pair X3
+    .venv/bin/python strain_tracking/animate_calibration.py --test N1690/test2 --def Def01 --pair X3
 Output: <test>/DIC_results/<Def>_scale_calibration_<pair>.mp4
 """
 import argparse

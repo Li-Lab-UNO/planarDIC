@@ -28,7 +28,7 @@ family is found reliably. Uncertainty: protocol-level bootstrap (resample whole
 protocols with replacement, refit from the best solution); resamples that fall into the
 elastin-off minimum are discarded and counted.
 
-    ../.venv/bin/python compare_stretch_inputs.py --test N1739/test1
+    .venv/bin/python constitutive_fit/compare_stretch_inputs.py --test N1739/test1
 Outputs: <test>/constitutive_fit/
 """
 import argparse

@@ -7,10 +7,10 @@ interior mean, points valid in fewer than half the frames gray, lowest 3 x 2 mm 
 physical window (--window-mm) so specimens imaged at different zoom are smoothed alike.
 Tests without a track for every one of Def11-Def19 are left out, with a note.
 
-    ../.venv/bin/python compare_peak_j.py --samples N1739 N1690      (window from analysis_settings.json)
-    ../.venv/bin/python compare_peak_j.py --samples N1739            (one sample; up to four)
-    ../.venv/bin/python compare_peak_j.py --samples N1739 N1690 --window-mm 1.4
-    ../.venv/bin/python compare_peak_j.py --samples N1739 N1690 --edge-mm 1.6 2.0   (another interior)
+    .venv/bin/python strain_tracking/compare_peak_j.py --samples N1739 N1690      (window from analysis_settings.json)
+    .venv/bin/python strain_tracking/compare_peak_j.py --samples N1739            (one sample; up to four)
+    .venv/bin/python strain_tracking/compare_peak_j.py --samples N1739 N1690 --window-mm 1.4
+    .venv/bin/python strain_tracking/compare_peak_j.py --samples N1739 N1690 --edge-mm 1.6 2.0   (another interior)
 Output: comparisons/peak_J_<samples>_w<L>mm[_edge<Z>x<TH>mm].png / .csv
 """
 import argparse

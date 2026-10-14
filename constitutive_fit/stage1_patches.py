@@ -25,8 +25,8 @@ Each alpha_k is fitted independently, so --exclude-ring N leaves every interior 
 It drops the outer N rings of patches (next to the tine tips) from the color scales, the summary
 statistics, the diagnostics and the example fits, so the interior pattern can be read on its own.
 
-    ../.venv/bin/python stage1_patches.py --test N1739/test1                    -> local/stage1/
-    ../.venv/bin/python stage1_patches.py --test N1739/test1 --exclude-ring 1   -> local/stage1_interior1/
+    .venv/bin/python constitutive_fit/stage1_patches.py --test N1739/test1                    -> local/stage1/
+    .venv/bin/python constitutive_fit/stage1_patches.py --test N1739/test1 --exclude-ring 1   -> local/stage1_interior1/
 Outputs: <test>/constitutive_fit/local/stage1[_interiorN]/
     stage1_patches.csv     per-patch alpha, alpha_z, alpha_theta, 95% intervals, RMS, coverage
     stage1_results.npz     the same as arrays [theta row, z column], plus the patch-mean F

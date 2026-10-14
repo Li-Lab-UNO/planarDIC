@@ -6,7 +6,7 @@ to just inside the rest-state tine tips (tine_tips_px). For N1739 test1: ROI [76
 ending 5-15 px inside the tips; the standard 37 x 32 grid is rows 2:-2, cols 2:-2 of this one.
 Other scripts import ROI, TINE_TIPS and SUFFIX from here.
 
-    ../.venv/bin/python track_tine_region.py --test N1739/test1
+    .venv/bin/python strain_tracking/track_tine_region.py --test N1739/test1
 Outputs: <test>/DIC_results/DefNN_*.npz
 """
 import argparse

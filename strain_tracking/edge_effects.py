@@ -22,7 +22,7 @@ distances measured here next to the current setting (dashed green on the plots, 
 within_current in the .csv) and changes nothing. To change the interior, edit edge_mm, or pass
 --edge-mm Z THETA to peak_j_figure.py / compare_peak_j.py for one run.
 
-    ../.venv/bin/python edge_effects.py --tests N1739/test1 N1690/test1
+    .venv/bin/python strain_tracking/edge_effects.py --tests N1739/test1 N1690/test1
 Output: comparisons/edge_effects_<tests>.png / .csv / _profiles.csv
 """
 import argparse

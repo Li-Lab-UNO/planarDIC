@@ -16,7 +16,7 @@ Direction test: the combined fit (same settings and lambda as stage2_fit.py) rep
 then each group's map is scored on the other groups' equations. If one alpha per patch were adequate, the maps
 would agree and cross-prediction would cost little.
 
-    ../.venv/bin/python stage2_residuals.py --test N1739/test1
+    .venv/bin/python constitutive_fit/stage2_residuals.py --test N1739/test1
 Outputs: <test>/constitutive_fit/local/stage2_fit/stage2_residuals.png / .json
 """
 import json

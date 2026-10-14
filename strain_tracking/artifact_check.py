@@ -18,9 +18,9 @@ as a red/blue pair in J. Here they are found and confirmed without a person look
    neighboring subsets track on the rest (see README, Excluded regions). The test then has to be tracked
    again (runDIC.sh does this).
 
-    ../.venv/bin/python artifact_check.py --test N1739/test3
-    ../.venv/bin/python artifact_check.py --test N1739/test3 --report-only
-    ../.venv/bin/python artifact_check.py --test N1739/test3 --track other_Def11.npz --report-only
+    .venv/bin/python strain_tracking/artifact_check.py --test N1739/test3
+    .venv/bin/python strain_tracking/artifact_check.py --test N1739/test3 --report-only
+    .venv/bin/python strain_tracking/artifact_check.py --test N1739/test3 --track other_Def11.npz --report-only
 Exit status: 0 nothing to change, 3 test_config.json updated (track the test again).
 Output: <test>/DIC_results/artifact_check.png
 """

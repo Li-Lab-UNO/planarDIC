@@ -21,9 +21,9 @@ Grid (--grid):
                          Usually not needed: dic2d.load_track(..., "standard") slices it from the
                          full-domain track.
 
-    ../.venv/bin/python track_protocols.py --test N1739/test1
-    ../.venv/bin/python track_protocols.py --test N1690/test1 --defs Def11
-    ../.venv/bin/python track_protocols.py --test N1739/test1 --loading-only
+    .venv/bin/python strain_tracking/track_protocols.py --test N1739/test1
+    .venv/bin/python strain_tracking/track_protocols.py --test N1690/test1 --defs Def11
+    .venv/bin/python strain_tracking/track_protocols.py --test N1739/test1 --loading-only
 
 --loading-only stops each deformation at the end of loading, the frame where the rakes peak
 (dic2d.loading_end_time; the fits end the loading branch there too), about half the frames. Tracking runs forward, so the loading frames are the
