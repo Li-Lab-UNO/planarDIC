@@ -8,8 +8,16 @@ others, and the code finds it automatically.
 - `constitutive_fit/`: bulk and local constitutive fits.
 - `thickness/`: wall thickness from the strip photos.
 - `runDIC.sh`: runs the tracking pipeline for one or more tests (see "Running the pipeline").
+- `matlab/`: a MATLAB version of the steps up to the stress–stretch data (thickness from the photos,
+  sorting, tine tips, scale, tine spans, DIC tracking, stress–stretch CSVs and CellScale-style AllData
+  file, tracking report), for Windows users without Python; see `matlab/README.md`.
 
 ## Layout
+
+The Python pipeline is the top level: its code folders, `runDIC.sh` and the shared settings, all run from
+the project folder. `matlab/` is a self-contained port of the steps up to the stress–stretch data: it
+refers to nothing outside its folder, so it can be copied to a Windows computer on its own. Both work
+on the same sample and test folders and share `test_config.json` and `scale_calibration.json`.
 
 ```
 planarDIC/
@@ -18,7 +26,8 @@ planarDIC/
 ├── analysis_settings.json  physical sizes shared by every test (subset, grid step, strain window, ...)
 ├── requirements.txt        Python packages (.venv)
 ├── NEW_TEST_UBUNTU.md      a new test, step by step, on Ubuntu
-├── strain_tracking/  constitutive_fit/  thickness/
+├── strain_tracking/  constitutive_fit/  thickness/   the Python code
+├── matlab/                 the MATLAB version, self-contained (runDIC.m, viewTracking.m, lib/)
 ├── comparisons/            cross-test and cross-sample figures and tables (DIC_logs/: their run logs)
 └── <SAMPLE>/               e.g. N1739_LFPA: one folder per sample
     ├── Thickness, <ID>/    thickness photos in test <N>/, their results in thickness_auto/test<N>/
@@ -31,6 +40,8 @@ planarDIC/
         ├── DIC_results/              tracks (DefNN_*.npz), exports and figures, named by deformation;
         │                                config_tine_tips, scale_calibration, artifact_check, peak_J_over_mean
         ├── constitutive_fit/            fit outputs for this test (see constitutive_fit/README.md)
+        ├── stress_stretch/, thickness/  written by the MATLAB version, as are its tracks
+        │                                (DIC_results/DefNN_*.mat; see matlab/README.md)
         └── Images/
             ├── Def01_… / … Def19_…/     images, one folder per load–unload cycle (sort_images.py)
             └── sort_manifest.csv        old → new path for every sorted image

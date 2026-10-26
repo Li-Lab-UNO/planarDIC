@@ -32,7 +32,8 @@ from matplotlib.colors import TwoSlopeNorm  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
-sys.path.insert(1, os.path.join(os.path.dirname(HERE), "strain_tracking"))
+sys.path.insert(1, os.path.dirname(HERE))                                              # constitutive_fit/
+sys.path.insert(2, os.path.join(os.path.dirname(os.path.dirname(HERE)), "strain_tracking"))
 import baseline as B  # noqa: E402
 import constitutive as M  # noqa: E402
 from stage2_fit import combined_system  # noqa: E402

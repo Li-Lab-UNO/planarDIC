@@ -41,7 +41,8 @@ from scipy.sparse import coo_matrix, diags, vstack  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
-sys.path.insert(1, os.path.join(os.path.dirname(HERE), "strain_tracking"))
+sys.path.insert(1, os.path.dirname(HERE))                                              # constitutive_fit/
+sys.path.insert(2, os.path.join(os.path.dirname(os.path.dirname(HERE)), "strain_tracking"))
 from stage1_patches import LOCAL, load_inputs  # noqa: E402
 
 

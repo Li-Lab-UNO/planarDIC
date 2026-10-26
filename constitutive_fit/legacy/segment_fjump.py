@@ -52,7 +52,8 @@ from scipy.sparse.csgraph import connected_components, shortest_path  # noqa: E4
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
-sys.path.insert(1, os.path.join(os.path.dirname(HERE), "strain_tracking"))
+sys.path.insert(1, os.path.dirname(HERE))                                              # constitutive_fit/
+sys.path.insert(2, os.path.join(os.path.dirname(os.path.dirname(HERE)), "strain_tracking"))
 import testcfg  # noqa: E402
 import baseline as B  # noqa: E402
 import dic2d as D  # noqa: E402

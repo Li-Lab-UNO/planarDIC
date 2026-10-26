@@ -25,6 +25,14 @@
 /thickness/*
 !/thickness/*.py
 !/thickness/*.md
+# MATLAB version (for Windows users): .m and Markdown files only
+!/matlab/
+/matlab/*
+!/matlab/*.m
+!/matlab/*.md
+!/matlab/lib/
+/matlab/lib/*
+!/matlab/lib/*.m
 
 __pycache__/
 *.pyc

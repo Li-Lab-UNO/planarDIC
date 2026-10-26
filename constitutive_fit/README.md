@@ -2,8 +2,7 @@
 
 The bulk four-fiber family model (Jadidi et al. 2019, Eq. 2) is fitted to the stretch-ratio
 protocols Def11–Def19 (PhaseTiming Sets 2–10), and local material properties are estimated
-from the DIC strain fields. `local_estimation_handoff.md` documents the local method, its
-status and its findings.
+from the DIC strain fields in stages, each tested on synthetic data before the measured data (below).
 
 Every script needs a test (`--test SAMPLE/testN`, e.g. `--test N1739/test1`, or `DIC_TEST`; see the top-level `README.md`).
 The thickness and widths default to that test's `test_config.json`. The scripts import
@@ -20,8 +19,7 @@ constitutive_fit/
 ├── baseline/                frozen bulk baseline, full-domain tracks (primary)
 ├── standard_roi/            the same on the standard ROI (--tracks standard), with its baseline/
 ├── fit_4pt_*                bulk fit to the CellScale 4-point tracking
-└── local/                   local estimation: local_data.npz, Stage 0 figures,
-                             stage1*/, segmentation/, stage2_*/
+└── local/                   local estimation: stage0_*, stage1_*, stage1b_*, stage2_* (.csv / .json / .npz / .png)
 ```
 
 ## Scripts
@@ -38,18 +36,21 @@ constitutive_fit/
 
 ### Local estimation
 
+Stages from the bulk fit toward local properties. Every stage uses the fixed eight-parameter model and the test's
+bulk fit (DIC affine F); the finite element stages model the tracked domain with the measured boundary positions
+prescribed, and compare strains in the interior (`edge_mm` of `analysis_settings.json`).
+
 | File | Purpose |
 |---|---|
-| `build_local_data.py` | Stage 0: builds `local_data.npz`. It holds F per frame on the full-domain grid in the specimen frame, tared forces, patches and checksums, plus the band diagnostics. No fitting |
-| `stage1_patches.py` | Stage 1: one stiffness factor per patch from the patch-mean F and the global stress (uniform stress assumed). `--exclude-ring N` |
-| `stage1_smooth.py` | Stage 1 with a neighbor smoothness penalty on log α. The penalty weight is chosen by leave-one-protocol-out cross-validation |
-| `segment_fjump.py` | Splits the domain into subdomains wherever F jumps between neighboring elements (Witzenburg et al. 2016) |
-| `membrane_fe.py` | Finite element solver for the incompressible plane-stress membrane on the DIC grid (Q1 elements, prescribed boundary displacements) |
-| `stage2_setup.py` | Stage 2 equations and conditioning checks. The equations are section cuts plus interior virtual fields. No fitting |
-| `stage2_synthetic.py`, `stage2_synthetic_b.py`, `stage2_synthetic_c.py` | Synthetic recovery tests on finite element data. They cover one factor per patch, separate matrix and fiber factors, and exponents that vary by patch. Finite element solutions are cached as `fe_*.npz` |
-| `stage2_fit.py` | Stage 2 fit of patch stiffness factors on the measured data, with a bootstrap, a bulk score and a finite element forward check |
-| `stage2_residuals.py` | Stage 2 misfit by protocol, load level and virtual-field mode, and cross-prediction between loading-ratio groups |
-| `stage2_exponent_fit.py` | Fits a stiffness factor and an exponent factor per patch (`--synthetic NAME` runs the recovery check) |
+| `stage0_identifiability.py` | Stage 0: profile of the bulk misfit for each parameter (the other seven refitted): the range within +1% and +5% RMS, whether it reaches a bound, and the parameter it trades off with |
+| `stage1_uniform_fe.py` | Stage 1: a uniform material (the bulk fit) in the finite element model. Share of the interior and edge-band strain variance it explains, rest-frame noise bound, force resultants across mid-domain cuts; peak maps of every protocol |
+| `stage1b_best_uniform.py` | Stage 1 check: the uniform material whose response shape (seven parameters, C1_smc fixed) best fits the interior strains of Def11, Def14 and Def18, scored on the other six protocols and on the bulk forces |
+| `stage2_alpha_field.py` | Stage 2: a smooth stiffness factor α(x) on the whole response (Cgr and every C1; in a membrane the same as local thickness), log α a Legendre polynomial basis (total degree, or separate degrees in z and θ such as `2x6`). `--synthetic NAME` for recovery checks (`uniform`, `smooth`, `bands`, `bands_theta` positive control, `bands_shape` model-error control); `--groups` fits each loading-ratio group separately and cross-predicts (direction test), `--groups sequence` the equibiaxial protocols in run order |
+| `membrane_fe.py` | Finite element solver for the incompressible plane-stress membrane on the DIC grid (Q1 elements, prescribed boundary displacements, optional stiffness factor per Gauss point) |
+| `solid_fe.py` | Finite element solver for the same model as a 3D slab on the DIC grid: hexahedral elements, several layers through a thickness that can vary over the grid, near incompressibility by a mean-dilatation penalty, side faces prescribed through the full thickness, top and bottom faces free; Newton with a sparse direct solve, started from a membrane solution or a coarser layering. `python constitutive_fit/solid_fe.py` runs the self-checks (stress and forces against the energy, homogeneous stretch against the membrane model) |
+
+`legacy/` holds the earlier local scripts (uniform-stress patch fits, deformation-gradient-jump segmentation,
+virtual-field equations) and their notes. They are not maintained and write to the same `local/` folder.
 
 ## Usage
 
