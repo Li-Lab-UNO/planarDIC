@@ -62,9 +62,9 @@ laptop with fewer cores. Progress is printed in the Command Window.
 After the images are sorted, `runDIC` shows a table of the folders Def01–Def19 with the number of
 images in each and the frames missing from the tester's files: images, rows of `Data.csv` (forces,
 rake positions) and rows of `Coords1.csv` (CellScale's 4 points), each a gap in their times. It then
-**asks whether to proceed**. Folders missing anything are marked red. A few missing frames are normal
-(the camera drops frames now and then); a folder with no images, or many missing, means the test or its
-folders need a look before going on. "No, stop this test" stops that test only. The table is saved as
+**asks whether to proceed**. Folders missing anything are marked red. A few missing frames (up to about 5
+in a folder) are normal: the camera drops frames now and then. A folder with no images, or more
+missing, means the test or its folders need a look before going on. "No, stop this test" stops that test only. The table is saved as
 `Images\sort_summary.csv`.
 
 When the tine tips have been found, `runDIC` shows them and asks **whether every red circle is on the
@@ -250,6 +250,12 @@ runDIC(folder, 'steps', {'track', 'export'})
 
 Each step uses what the earlier ones wrote, so after changing something, run that step and the ones
 after it.
+
+## If a run stops
+
+When a test fails, the Command Window prints `=== test… FAILED:` and the reason; in a sample folder, the
+other tests still run. Ctrl-C in the Command Window stops a run. Running `runDIC` again on the same
+folder marks the steps already done; pick the others. A tracking step that was interrupted starts over.
 
 ## Settings
 
