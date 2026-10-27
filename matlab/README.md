@@ -9,6 +9,8 @@ export. A tracking report shows the tracking of every protocol at the end.
 
 It runs on Windows, macOS and Linux with **MATLAB R2021a or later and no toolboxes**.
 
+For a first run, print `QUICKSTART.pdf`: every window in order, with screenshots and what to answer.
+
 ## Setting up (once)
 
 1. Copy this `matlab` folder anywhere on your computer, for example `Documents\runDIC`.

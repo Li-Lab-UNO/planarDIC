@@ -16,7 +16,8 @@ for n = allDefs
     a1 = util.rakePeak(D, a0, tRec, 2.0);
     [t0, t1] = util.loadingBranch(testRoot, n, P, D);
     dur = tRec - a0;
-    info(end + 1) = struct('key', sprintf('Def%02d', n), 'name', st(n).SetName, 'a0', a0, 'a1', a1, 'tRec', tRec, ...
+    name = regexprep(st(n).SetName, '\s+save\s+cyc?le$', '', 'ignorecase');   % 'save cycle' is a label only
+    info(end + 1) = struct('key', sprintf('Def%02d', n), 'name', name, 'a0', a0, 'a1', a1, 'tRec', tRec, ...
         'w0', max(D.t(1), min(t0, a0) - max(2, 0.15 * dur)), 'w1', min(D.t(end), max(t1, tRec) + max(4, 0.4 * dur)), ...
         't0', t0, 't1', t1); %#ok<AGROW>
 end
@@ -112,7 +113,8 @@ function fig = plotBranches(D, info, testRoot, path)
 % Every branch on the rake forces: shown in a window (returned) with an empty path, else saved to path.
 show = isempty(path);
 if show
-    fig = figure('Name', 'runDIC: loading branches', 'NumberTitle', 'off', 'Color', 'w', 'WindowState', 'maximized');
+    fig = figure('Name', 'runDIC: loading branches', 'NumberTitle', 'off', 'Color', 'w', 'WindowState', 'maximized', ...
+                 'MenuBar', 'none', 'ToolBar', 'none');
 else
     d = fileparts(path); if ~isfolder(d), mkdir(d); end
     fig = figure('Visible', 'off', 'Color', 'w', 'Position', [100 100 1400 1000] .* [1 1 1 + (numel(info) > 9) * [0.3 0.25]]);

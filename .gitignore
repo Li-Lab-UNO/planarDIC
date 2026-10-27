@@ -30,6 +30,7 @@
 /matlab/*
 !/matlab/*.m
 !/matlab/*.md
+!/matlab/QUICKSTART.pdf
 !/matlab/lib/
 /matlab/lib/*
 !/matlab/lib/*.m

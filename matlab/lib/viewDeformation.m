@@ -23,6 +23,7 @@ trk = []; k = 1; playing = false; imgDir = '';
 
 % ---- window
 fig = figure('Name', ['runDIC: tracking, ' util.shortName(testRoot)], 'NumberTitle', 'off', 'Color', 'w', ...
+             'MenuBar', 'none', 'ToolBar', 'none', ...
              'WindowState', 'maximized', 'CloseRequestFcn', @onClose);
 ax = axes(fig, 'Units', 'normalized', 'Position', [0.03 0.1 0.72 0.86]);
 hImg = imagesc(ax, zeros(10)); colormap(ax, gray); axis(ax, 'image', 'off'); hold(ax, 'on');

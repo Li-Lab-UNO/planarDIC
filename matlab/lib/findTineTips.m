@@ -364,7 +364,8 @@ function fig = overlay(gray8, rakes, tipsPx, path)
 % empty path, shown in a window (returned).
 show = isempty(path);
 if show
-    fig = figure('Name', 'runDIC: tine tips', 'NumberTitle', 'off', 'Color', 'w', 'WindowState', 'maximized');
+    fig = figure('Name', 'runDIC: tine tips', 'NumberTitle', 'off', 'Color', 'w', 'WindowState', 'maximized', ...
+                 'MenuBar', 'none', 'ToolBar', 'none');
 else
     [d, ~] = fileparts(path); if ~isfolder(d), mkdir(d); end
     fig = figure('Visible', 'off', 'Color', 'w', 'Position', [100 100 900 900]);
