@@ -60,11 +60,11 @@ end
 
 try
     if any(strcmp(s.steps, 'info')) && usejava('desktop')
-        askInfo(tests);                  % up front too
+        util.log('-- label and notes'); askInfo(tests);   % up front too
     end
     measuring = any(strcmp(s.steps, 'thickness'));
     if usejava('desktop') && (measuring || (any(strcmp(s.steps, 'export')) && s.ask_thickness))
-        askThickness(tests, s, measuring);         % up front too, so the run doesn't stop later
+        util.log('-- thickness'); askThickness(tests, s, measuring);   % up front too, so the run doesn't stop later
     end
 catch err
     if ~strcmp(err.identifier, 'runDIC:cancelled'), rethrow(err); end
@@ -132,7 +132,9 @@ for st = s.steps
         case 'track'
             if skipTrack, util.log('-- tracking: skipped, the tracks saved before are kept'); continue; end
             need('scale_calibration.json');
-            util.log('-- tracking'); trackProtocols(testRoot, s);
+            util.log('-- tracking %s, %s', util.defList(s.track_deformations), ...
+                     util.ternary(s.loading_only, 'loading branches only', 'whole cycles'));
+            trackProtocols(testRoot, s);
             trackingStats(testRoot, s);
         case 'artifacts'
             if skipTrack, util.log('-- tracking artifact check: skipped with the tracking'); continue; end
@@ -147,7 +149,12 @@ for st = s.steps
                 [s.export_deformations, s.export_formats, skip] = chooseExport(testRoot, s);
                 if skip, util.log('-- export: skipped, the files saved before are kept'); continue; end
             end
-            util.log('-- export'); exportStressStretch(testRoot, s);
+            if isempty(s.export_deformations) || isempty(s.export_formats)
+                util.log('-- export: nothing picked, only README.txt');
+            else
+                util.log('-- export %s: %s', util.defList(s.export_deformations), strjoin(s.export_formats, ', '));
+            end
+            exportStressStretch(testRoot, s);
             if any(strcmp(s.export_formats, 'xlsx')), exportAllData(testRoot, s); end
         case 'report'
             trackingStats(testRoot, s);     % the window opens when every test is done
@@ -247,7 +254,7 @@ for i = 1:n
     H = str2double(strrep(a, ',', '.'));
     [~, name] = fileparts(shown{i});
     test = regexp(name, '^test\d+', 'match', 'once');
-    if isempty(a) || strcmp(a, fmt(Hsaved(i)))                          % as saved: its source is kept
+    if isempty(a) || (any(strcmp(src{i}, {'saved', 'typed'})) && strcmp(a, fmt(Hsaved(i))))   % as saved: its source kept
         if isfinite(Hsaved(i))
             util.log('  %s: kept %.3f mm (%s)', test, Hsaved(i), srcSaved{i});
         else
@@ -360,7 +367,6 @@ delete(fig);
 if ~skip
     if isempty(defs), util.cancel('the tracking choice (no deformation picked)'); end
     c('defs') = defs; c('loading_only') = loadingOnly; %#ok<NASGU> a handle: kept for the next test
-    util.log('-- tracking %s, %s', util.defList(defs), util.ternary(loadingOnly, 'loading branches only', 'whole cycles'));
 end
 
     function pick(k)
@@ -440,11 +446,6 @@ formats = fmt(logical(cell2mat(get(fbox, 'Value'))), 1)';
 delete(fig);
 if ~skip
     c('export_defs') = defs; c('export_formats') = formats; %#ok<NASGU> a handle: kept for the next test
-    if isempty(defs) || isempty(formats)
-        util.log('-- export: nothing picked, only README.txt');
-    else
-        util.log('-- export %s: %s', util.defList(defs), strjoin(formats, ', '));
-    end
 end
 
     function pick(k)

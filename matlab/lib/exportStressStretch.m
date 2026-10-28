@@ -26,7 +26,7 @@ T = table();
 tRef = [];
 handSet = {};
 defs = settings.export_deformations; formats = settings.export_formats;
-if isempty(defs), util.log('Stress-stretch: no deformation to export'); return; end
+if isempty(defs), util.log('  stress-stretch: no deformation to export'); return; end
 for n = defs
     fd = util.defFolder(testRoot, n);
     f = fullfile(testRoot, 'DIC_results', [fd '.mat']);
@@ -79,10 +79,10 @@ writeReadme(fullfile(outDir, 'README.txt'), cfg, w, H, Hsource, trk, handSet, se
 plots = intersect({'png', 'pdf', 'fig'}, formats, 'stable');
 if ~isempty(plots), plotStressStretch(T, H, cfg, fullfile(outDir, 'stress_stretch'), plots); end
 if isfinite(H)
-    util.log('Stress-stretch: %d protocols, %d rows (H = %.3f mm from %s, widths %.2f / %.2f mm) -> stress_stretch/', ...
+    util.log('  stress-stretch: %d protocols, %d rows (H = %.3f mm from %s, widths %.2f / %.2f mm) -> stress_stretch/', ...
              numel(defs), height(T), H, Hsource, w(1), w(2));
 else
-    util.log(['Stress-stretch: %d protocols, %d rows -> stress_stretch/ (NO THICKNESS: the stress columns are NaN; ' ...
+    util.log(['  stress-stretch: %d protocols, %d rows -> stress_stretch/ (NO THICKNESS: the stress columns are NaN; ' ...
               'run the thickness step, see README.md)'], numel(defs), height(T));
 end
 end

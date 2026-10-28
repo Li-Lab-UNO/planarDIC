@@ -32,7 +32,7 @@ cfg.widths_mm.tine_span = w;
 cfg.widths_mm.tine_span_by_rake = span;
 util.writeJSON(cfgFile, cfg);
 widths = cfg.widths_mm;
-util.log('Tine spans: left %.2f, right %.2f, top %.2f, bottom %.2f mm -> w_theta %.2f, w_z %.2f mm', ...
+util.log('  tine spans: left %.2f, right %.2f, top %.2f, bottom %.2f mm -> w_theta %.2f, w_z %.2f mm', ...
          span.left, span.right, span.top, span.bottom, w(1), w(2));
 end
 

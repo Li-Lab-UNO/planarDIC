@@ -143,7 +143,7 @@ if settings.review_tines && usejava('desktop')
         answer = askTips(gray8, rakes, tipsPx, rakeNames, saved);
         if strcmp(answer, 'Cancel'), util.cancel('the tine tips'); end
         if strcmp(answer, 'Skip')
-            util.log('Tine tips: skipped, the tips saved before are kept');
+            util.log('  skipped, the tips saved before are kept');
             cfg = util.readJSON(fullfile(testRoot, 'test_config.json'));
             return
         end
@@ -175,7 +175,7 @@ if ~isfield(cfg.dic, 'mask_saturated')
 end
 util.writeJSON(cfgFile, cfg);
 overlay(gray8, rakes, tipsPx, fullfile(testRoot, 'DIC_results', 'config_tine_tips.png'));
-util.log('Tine tips: z %d-%d px, theta %d-%d px (%d of 20 refined); saturated %.2f%% of the tine region', ...
+util.log('  tine tips: z %d-%d px, theta %d-%d px (%d of 20 refined); saturated %.2f%% of the tine region', ...
          z0, z1, y0, y1, 20 - sum(cellfun(@(f) keptBy.(f), fieldnames(keptBy))), sat);
 end
 

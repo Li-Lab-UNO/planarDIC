@@ -41,7 +41,7 @@ for k = 1:numel(files)
     new = fullfile(imgDir, names{i}, files(k).name);
     if ~strcmp(old, new), moves(end + 1, :) = {old, new}; end %#ok<AGROW>
 end
-util.log('Sorting %d images into %d deformation folders (%d to move, %d outside every cycle)', ...
+util.log('  %d images into %d deformation folders (%d to move, %d outside every cycle)', ...
          numel(files), numel(names), size(moves, 1), nUnassigned);
 if ~isempty(moves), moveImages(moves, testRoot, imgDir); end
 tRec = arrayfun(@(i) recoverStart(P, i), 1:numel(names));
