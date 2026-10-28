@@ -47,11 +47,12 @@ done, and runs the ones you pick (all of them the first time). Then a window ask
 each test (for example healthy) and **notes** (tears, re-mounting, anything unusual), filled in with
 what was saved before; they go into `test_config.json` and the results' `README.txt`. Then a window asks for the
 wall thickness of each test, typed or measured from the test's photos (see "Thickness"). With the
-`track` step, each test's images are sorted and its tine tips found first; then a window asks which of its deformations to track
+`track` step, each test's images are sorted, its tine tips found and its image scale and tine spans
+measured first; then a window asks which of its deformations to track
 (the sorted folders Def01–Def19; "(tracked)" marks the ones already tracked) and whether to track the
 loading branch only (to the force peak; what the CSVs use) or the whole cycle. It is filled in with
 `track_deformations` and `loading_only`, and for the next test of a sample folder with the previous
-answer. It comes after the sorting check and the tine tips. With the `export` step, once the tracking
+answer. With the `export` step, once the tracking
 is done, a window asks which deformations to export (Def11–Def19 by default; grayed out: not tracked) and which files to write:
 one CSV per protocol, all protocols in one CSV, the stress-stretch plot as PNG, PDF or MATLAB figure,
 and the AllData file (see "The results"); it is filled in with `export_deformations` and
@@ -77,12 +78,12 @@ missing frames and whether they fall in loading or unloading (frames missing dur
 affect the exported loading curves). A few missing frames (up to about 5
 in a folder) are normal: the camera drops frames now and then. A folder with no images, or more
 missing, means the test or its folders need a look before going on. In a sample folder, "No, skip to
-the next test" stops this test and goes on with the others; "Cancel the run" stops the whole run. With
-one test, only "Cancel the run" is offered. The table is saved as `Images\sort_summary.csv`.
+the next test" stops this test and goes on with the others; "Cancel" stops the whole run. With
+one test, the choice is Proceed or Cancel. The table is saved as `Images\sort_summary.csv`.
 
 When the tine tips have been found, `runDIC` shows them and asks **whether every red circle is on the
 tip of a tine**, in one window: if a rake's circles are off, press its button ("Click LEFT again", ...)
-and click its tips (see below); the window then shows the tips again. "Yes, continue" goes on.
+and click its tips (see below); the window then shows the tips again. "Continue" goes on.
 
 The loading branch of each deformation (the part exported) runs from the start of stretching, read
 from the tester's phase timing, to the force peak; it is found automatically.
@@ -124,7 +125,7 @@ Each deformation is marked **Good**, **Check** (amber) or **Problem** (red) from
 is marked, the report opens at the worst frame of the worst one and says so at the top. A few red
 crosses that come and go are normal; a patch of red that persists, or grid lines that kink, is a
 tracking problem. Show a report with Check or Problem marks to your supervisor before using those
-results. "Open large" shows the selected deformation in a big viewer.
+results. "Open large" shows the selected deformation in a big viewer; "Finish" closes the report.
 
 The report reads the tracks already saved, so it can be opened again at any time without tracking:
 run `runDIC`, pick the test (or sample) folder and choose only the step `report`, or type
@@ -259,9 +260,11 @@ The steps are, in order: `info`, `thickness`, `sort`, `tines`, `scale`, `widths`
 runDIC(folder, 'steps', {'track', 'export'})
 ```
 
-Each of these questions, the thickness window at the start and the tracking window, has a **Cancel the run** button (in the
-label and notes window, **Cancel**): it stops the whole run there, including the tests not yet started in
-a sample folder. Closing one of these windows does the same. Tracking has no window; Ctrl-C in the Command Window
+Each of these windows (label and notes, thickness, sorting, tine tips, tracking, export) has a **Cancel**
+button: it stops the whole run there, including the tests not yet started in a sample folder. Closing one
+of these windows does the same. Where a step's results already exist (tine tips, tracks, exported
+files), its window also has **Skip**: the step is left out for this test and the results saved before
+are kept. Tracking has no window; Ctrl-C in the Command Window
 stops it.
 
 Each step uses what the earlier ones wrote, so after changing something, run that step and the ones

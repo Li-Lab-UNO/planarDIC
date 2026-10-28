@@ -138,11 +138,17 @@ tipsPx = tipLines(rakes);
 
 % ---- ask whether the tips are right, and let the wrong rakes be clicked (desktop only)
 if settings.review_tines && usejava('desktop')
+    saved = hasTips(testRoot);                         % tips saved before: Skip keeps them
     while true
-        answer = askTips(gray8, rakes, tipsPx, rakeNames);
-        if strcmp(answer, 'Cancel the run'), util.cancel('the tine tips'); end
+        answer = askTips(gray8, rakes, tipsPx, rakeNames, saved);
+        if strcmp(answer, 'Cancel'), util.cancel('the tine tips'); end
+        if strcmp(answer, 'Skip')
+            util.log('Tine tips: skipped, the tips saved before are kept');
+            cfg = util.readJSON(fullfile(testRoot, 'test_config.json'));
+            return
+        end
         r = find(strcmp(answer, clickLabels(rakeNames)));
-        if isempty(r), break; end                  % Yes, continue
+        if isempty(r), break; end                  % Continue
         rakes.(rakeNames{r}) = clickRake(gray8, rakeNames{r}, rakeHor(r), rakeOut(r), rakes.(rakeNames{r}).tips);
         keptBy.(rakeNames{r}) = C.N_RODS;              % kept as clicked
         tipsPx = tipLines(rakes);
@@ -421,21 +427,23 @@ R = struct('horizontal', hor, 'out', out, 'tips', round([c(:), t(:)]));
 end
 
 
-function answer = askTips(gray8, rakes, tipsPx, rakeNames)
-% The tips over the rest frame, in one window with the question and its answers: 'Yes, continue',
-% 'Click <RAKE> again' (that rake is then clicked) or 'Cancel the run' (also when the window is closed).
+function answer = askTips(gray8, rakes, tipsPx, rakeNames, saved)
+% The tips over the rest frame, in one window with the question and its answers: 'Continue',
+% 'Click <RAKE> again' (that rake is then clicked), 'Skip' (with tips saved before: keep them) or
+% 'Cancel' (also when the window is closed).
 fig = overlay(gray8, rakes, tipsPx, '');
-set(fig, 'UserData', 'Cancel the run', 'CloseRequestFcn', @(f, ~) util.answer(f, 'Cancel the run'));
+set(fig, 'UserData', 'Cancel', 'CloseRequestFcn', @(f, ~) util.answer(f, 'Cancel'));
 ax = get(fig, 'CurrentAxes');
 title(ax, {'Is every red circle on the tip of a tine? (The yellow rectangle joins the tips of each rake.)', ...
-      'If a rake''s circles are off, click that rake again with its button below.'}, 'FontSize', 11);
-labels = [clickLabels(rakeNames), {'Yes, continue', 'Cancel the run'}];
+      ['If a rake''s circles are off, click that rake again with its button below.', ...
+       repmat(' Skip keeps the tips saved before.', 1, saved)]}, 'FontSize', 11);
+labels = [clickLabels(rakeNames), {'Continue'}, repmat({'Skip'}, 1, saved), {'Cancel'}];
 hs = util.buttonRow(fig, labels, cellfun(@(a) @(~, ~) util.answer(fig, a), labels, 'UniformOutput', false), 0, 14);
 for k = 1:numel(rakeNames), set(hs(k), 'Position', get(hs(k), 'Position') - [48 0 0 0]); end   % a gap between the rakes and the answers
 set(fig, 'SizeChangedFcn', @(f, ~) placeRow(f, ax, hs, 0.08));
 placeRow(fig, ax, hs, 0.08);
 uiwait(fig);
-answer = 'Cancel the run';
+answer = 'Cancel';
 if isvalid(fig), answer = get(fig, 'UserData'); delete(fig); end
 end
 
@@ -446,6 +454,13 @@ function placeRow(fig, ax, hs, top)
 fp = getpixelposition(fig);
 set(ax, 'Position', [0.02 50 / fp(4) 0.96 1 - 50 / fp(4) - top]);
 util.centerRow(hs, fp(3) / 2);
+end
+
+
+function ok = hasTips(testRoot)
+% True when the test's test_config.json already has tine tips.
+f = fullfile(testRoot, 'test_config.json');
+ok = isfile(f) && isfield(util.readJSON(f), 'tine_tips_px');
 end
 
 

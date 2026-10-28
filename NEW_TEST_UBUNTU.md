@@ -95,7 +95,7 @@ This prints every command without running anything.
   its images and the frames missing from the tester's files (images, `Data.csv` rows, `Coords1.csv`
   rows); folders missing anything are red, with the times of the missing frames and whether they fall in
   loading or unloading (frames missing during unloading don't affect the loading curves). A few missing frames (up to about 5 in a folder) are normal:
-  click **Yes, proceed**. A folder with no images, or more missing, needs a look: **No, stop this test**
+  click **Proceed**. A folder with no images, or more missing, needs a look: **No, stop this test**
   skips its later steps. The table is saved as `Images/sort_summary.csv`.
 - **config** finds the 20 tine tips in the first Def11 image, refines them, and writes `test_config.json`
   with the tip lines, the label and a glint check. With an existing config it updates only the tine

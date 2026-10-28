@@ -222,7 +222,8 @@ class Report:
             if r["status"] != "good":
                 ax_mark.plot(r["worst_fraction"], 0.5, "^", ms=8, color=COL[r["status"]])
         self.pct = fig.text(0.76, 0.04, "", fontsize=review.TEXT_FONT)
-        self.blarge = review.button_row(fig, ["Open large"], W - 0.15, 0.2)[0]
+        self.blarge, self.bfinish = review.button_row(fig, ["Open large", "Finish"], W - 0.15, 0.2)
+        self.bfinish.on_clicked(lambda _: review.pyplot().close(fig))
         self.blarge.on_clicked(lambda _: self.large())
         fig.canvas.mpl_connect("button_press_event", self.on_click)
         self.timer = fig.canvas.new_timer(interval=40)

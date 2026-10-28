@@ -118,7 +118,7 @@ def main():
         fig = review.figure("runDIC: loading branches", toolbar=False)
         plot_all(fig, Dd, info, T, top=0.88, bottom=0.2)
         answer = review.ask(fig, "Does each shaded band cover one loading curve, from where the forces start to "
-                            "rise to where they peak?", ["Yes, continue", "No, fix some"])
+                            "rise to where they peak?", ["Continue", "No, fix some"])
         if answer != "No, fix some":
             break
         items = [f"{b['key']}  {b['name']}{'  (set by hand)' if by_hand(b) else ''}" for b in info]

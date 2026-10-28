@@ -75,9 +75,10 @@ for i = find(sev > 1)
     plot(axMark, R(i).worst_fraction, 0.5, '^', 'MarkerSize', 8, 'MarkerFaceColor', COL.(R(i).status), ...
          'MarkerEdgeColor', 'none');
 end
-txtPct = uicontrol(fig, 'Style', 'text', 'Units', 'normalized', 'Position', [0.77 0.028 0.12 0.03], 'FontSize', 10, ...
+txtPct = uicontrol(fig, 'Style', 'text', 'Units', 'normalized', 'Position', [0.77 0.028 0.09 0.03], 'FontSize', 10, ...
                    'BackgroundColor', 'w', 'HorizontalAlignment', 'left');
 btnLarge = util.button(fig, 'Open large', [0 0], @(~, ~) onLarge());
+btnFinish = util.button(fig, 'Finish', [0 0], @(~, ~) onClose());
 set(fig, 'SizeChangedFcn', @(~, ~) placeBar());
 placeBar();
 drawAll(true);
@@ -89,7 +90,8 @@ drawAll(true);
         fp = getpixelposition(fig); yb = round(0.033 * fp(4));
         pb = get(btnPlay, 'Position'); set(btnPlay, 'Position', [round(0.01 * fp(3)) yb pb(3:4)]);
         set(popSpeed, 'Position', [round(0.075 * fp(3)) yb 70 22]);
-        pl = get(btnLarge, 'Position'); set(btnLarge, 'Position', [round(0.99 * fp(3)) - pl(3) yb pl(3:4)]);
+        pf = get(btnFinish, 'Position'); set(btnFinish, 'Position', [round(0.99 * fp(3)) - pf(3) yb pf(3:4)]);
+        pl = get(btnLarge, 'Position'); set(btnLarge, 'Position', [pf(1) - 8 - pl(3) yb pl(3:4)]);
     end
 
     function T = makeTile(i, col, row)

@@ -142,7 +142,7 @@ if ~(settings.review_sort && usejava('desktop')), return; end
 
 fig = figure('Name', 'runDIC: sorted images', 'NumberTitle', 'off', 'Color', 'w', 'MenuBar', 'none', ...
              'ToolBar', 'none', 'Visible', 'off', 'Resize', 'off', ...
-             'CloseRequestFcn', @(f, ~) util.answer(f, 'Cancel the run'));
+             'CloseRequestFcn', @(f, ~) util.answer(f, 'Cancel'));
 rows = [T.folder, num2cell(T.images), compose('%.1f', T.first_image_s), compose('%.1f', T.last_image_s), ...
         num2cell([T.images_missing, T.data_rows_missing, T.coords_rows_missing]), T.note];
 rows(flag, end) = strcat('<html><b><font color="red">', rows(flag, end), '</font></b></html>');
@@ -170,16 +170,16 @@ yq = 14 + 22 + 12; yi = yq + hq + 10; yt = yi + hi + 12; H = yt + th + 16;   % f
 set(hQ, 'Position', [20 yq W - 40 hq]); set(hInfo, 'Position', [20 yi W - 40 hi]);
 set(tbl, 'Position', [20 yt tw th]);
 set(fig, 'Position', [100 100 W H]); movegui(fig, 'center');
-answers = {'Yes, proceed', 'Cancel the run'};
+answers = {'Proceed', 'Cancel'};
 if isfield(settings, 'n_tests') && settings.n_tests > 1       % other tests in the run: stopping this one is a choice
-    answers = {'Yes, proceed', 'No, skip to the next test', 'Cancel the run'};
+    answers = {'Proceed', 'No, skip to the next test', 'Cancel'};
 end
 util.buttonRow(fig, answers, cellfun(@(a) @(~, ~) util.answer(fig, a), answers, 'UniformOutput', false), W - 20, 14);
 set(fig, 'Visible', 'on');
 uiwait(fig);
-answer = 'Cancel the run';
+answer = 'Cancel';
 if isvalid(fig), answer = get(fig, 'UserData'); delete(fig); end
-if strcmp(answer, 'Cancel the run'), util.cancel('the sorting check'); end
+if strcmp(answer, 'Cancel'), util.cancel('the sorting check'); end
 if strcmp(answer, 'No, skip to the next test')
     error('runDIC:stopped', 'Stopped after sorting (see Images/sort_summary.csv)');
 end

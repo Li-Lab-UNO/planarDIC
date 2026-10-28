@@ -108,9 +108,10 @@ function runSteps(testRoot, s)
 need = @(f) assert(isfile(fullfile(testRoot, f)), 'runDIC:missing', 'Missing %s: run the earlier steps first', f);
 needTips = @() assert(hasField(testRoot, 'tine_tips_px'), 'runDIC:missing', 'No tine tips yet: run the tines step first');
 askTracking = any(strcmp(s.steps, 'track')) && s.ask_tracking && usejava('desktop');
+skipTrack = false;                                   % Skip in the tracking window: the tracks saved before are kept
 for st = s.steps
-    if askTracking && ~ismember(st{1}, {'info', 'thickness', 'sort', 'tines'})   % after the sorting and the tine tips
-        [s.track_deformations, s.loading_only] = chooseTracking(testRoot, s);
+    if askTracking && ~ismember(st{1}, {'info', 'thickness', 'sort', 'tines', 'scale', 'widths'})   % after the tine tips, scale and spans
+        [s.track_deformations, s.loading_only, skipTrack] = chooseTracking(testRoot, s);
         askTracking = false;
     end
     switch st{1}
@@ -129,10 +130,12 @@ for st = s.steps
             need('scale_calibration.json');
             util.log('-- tine spans'); measureTineSpans(testRoot, s);
         case 'track'
+            if skipTrack, util.log('-- tracking: skipped, the tracks saved before are kept'); continue; end
             need('scale_calibration.json');
-            util.log('-- tracking (the long step)'); trackProtocols(testRoot, s);
+            util.log('-- tracking'); trackProtocols(testRoot, s);
             trackingStats(testRoot, s);
         case 'artifacts'
+            if skipTrack, util.log('-- tracking artifact check: skipped with the tracking'); continue; end
             util.log('-- tracking artifact check');
             if artifactCheck(testRoot, s)
                 util.log('-- tracking again, with the new excluded regions'); trackProtocols(testRoot, s);
@@ -141,7 +144,8 @@ for st = s.steps
             end
         case 'export'
             if s.ask_export && usejava('desktop')                % once the tracking is done
-                [s.export_deformations, s.export_formats] = chooseExport(testRoot, s);
+                [s.export_deformations, s.export_formats, skip] = chooseExport(testRoot, s);
+                if skip, util.log('-- export: skipped, the files saved before are kept'); continue; end
             end
             util.log('-- export'); exportStressStretch(testRoot, s);
             if any(strcmp(s.export_formats, 'xlsx')), exportAllData(testRoot, s); end
@@ -158,7 +162,7 @@ function steps = chooseSteps(tests, defaults)
 % Ask which steps to run, noting which ones the (first) test has already done.
 names = {'info', 'thickness', 'sort', 'tines', 'scale', 'widths', 'track', 'artifacts', 'export', 'report'};
 what = {'sample label and notes', 'measure the thickness from the photos', 'sort the images into one folder per cycle', 'find the tine tips', 'image scale', ...
-        'tine spans (specimen widths)', 'DIC tracking (the long step)', 'check the tracking for local errors', ...
+        'tine spans (specimen widths)', 'DIC tracking', 'check the tracking for local errors', ...
         'write the stress-stretch CSVs and the AllData file', 'open the tracking report (no tracking)'};
 t = tests{1};
 done = [~isempty(util.sampleInfo(t)), startsWith(thicknessSource(t), 'measure'), ~isempty(dir(fullfile(t, 'Images', 'Def11_*'))), ...
@@ -230,7 +234,7 @@ end
 uicontrol(fig, 'Style', 'text', 'Position', [20 50 W - 40 30], ...
           'HorizontalAlignment', 'left', 'BackgroundColor', 'w', 'ForegroundColor', [0.4 0.4 0.4], 'String', ...
           'OK saves the yellow boxes; Revert puts a box back as it was. A blank box changes nothing.');
-util.buttonRow(fig, {'OK', 'Cancel the run'}, {@(~, ~) uiresume(fig), @(~, ~) cancelRun()}, W - 20, 16);
+util.buttonRow(fig, {'OK', 'Cancel'}, {@(~, ~) uiresume(fig), @(~, ~) cancelRun()}, W - 20, 16);
 uiwait(fig);
 if cancelled || ~isvalid(fig)
     if isvalid(fig), delete(fig); end
@@ -299,9 +303,10 @@ if isfinite(H), str = sprintf('%.3f', H); else, str = ''; end
 end
 
 
-function [defs, loadingOnly] = chooseTracking(testRoot, s)
+function [defs, loadingOnly, skip] = chooseTracking(testRoot, s)
 % Ask which deformations of the test to track and how much of each cycle, filled in with the answer for
-% the previous test of the run, else the settings (track_deformations, loading_only).
+% the previous test of the run, else the settings (track_deformations, loading_only). When the test has
+% tracks, Skip leaves the tracking out (skip true) and keeps them.
 c = s.choices;
 if isKey(c, 'defs'), s.track_deformations = c('defs'); s.loading_only = c('loading_only'); end
 W = 660; Hfig = 420;                                      % in pixels; buttons as in MATLAB's own dialogs
@@ -340,8 +345,10 @@ rbLoad = uicontrol(grp, 'Style', 'radiobutton', 'Position', [10 24 W - 70 18], '
 rbAll = uicontrol(grp, 'Style', 'radiobutton', 'Position', [10 4 W - 70 18], 'BackgroundColor', 'w', ...
                   'String', 'Loading and unloading: the whole cycle (more frames, so longer)');
 grp.SelectedObject = util.ternary(s.loading_only, rbLoad, rbAll);
-util.buttonRow(fig, {'Track', 'Cancel the run'}, {@(~, ~) uiresume(fig), @(~, ~) cancelRun()}, W - 20, 14);
-cancelled = false;
+skipLabel = repmat({'Skip'}, 1, ~isempty(tracked));
+util.buttonRow(fig, [{'Track'}, skipLabel, {'Cancel'}], [{@(~, ~) uiresume(fig)}, repmat({@(~, ~) skipStep()}, 1, numel(skipLabel)), ...
+               {@(~, ~) cancelRun()}], W - 20, 14);
+cancelled = false; skip = false;
 uiwait(fig);
 if cancelled || ~isvalid(fig)
     if isvalid(fig), delete(fig); end
@@ -350,9 +357,11 @@ end
 defs = find(cell2mat(get(box, 'Value')))';
 loadingOnly = grp.SelectedObject == rbLoad;
 delete(fig);
-if isempty(defs), util.cancel('the tracking choice (no deformation picked)'); end
-c('defs') = defs; c('loading_only') = loadingOnly; %#ok<NASGU> a handle: kept for the next test
-util.log('-- tracking %s, %s', util.defList(defs), util.ternary(loadingOnly, 'loading branches only', 'whole cycles'));
+if ~skip
+    if isempty(defs), util.cancel('the tracking choice (no deformation picked)'); end
+    c('defs') = defs; c('loading_only') = loadingOnly; %#ok<NASGU> a handle: kept for the next test
+    util.log('-- tracking %s, %s', util.defList(defs), util.ternary(loadingOnly, 'loading branches only', 'whole cycles'));
+end
 
     function pick(k)
         for j = 1:19, box(j).Value = ismember(j, k); end
@@ -362,13 +371,18 @@ util.log('-- tracking %s, %s', util.defList(defs), util.ternary(loadingOnly, 'lo
         cancelled = true;
         uiresume(fig);
     end
+
+    function skipStep()
+        skip = true;
+        uiresume(fig);
+    end
 end
 
 
-function [defs, formats] = chooseExport(testRoot, s)
+function [defs, formats, skip] = chooseExport(testRoot, s)
 % Ask which deformations of the test to export and which files to write, filled in with the answer for
 % the previous test of the run, else the settings (export_deformations, export_formats). Deformations not
-% tracked are grayed out.
+% tracked are grayed out. When files were exported before, Skip leaves the export out (skip true).
 c = s.choices;
 if isKey(c, 'export_defs'), s.export_deformations = c('export_defs'); s.export_formats = c('export_formats'); end
 d = dir(fullfile(testRoot, 'DIC_results', 'Def*.mat'));
@@ -411,8 +425,11 @@ for k = 1:nf
     fbox(k) = uicontrol(grp, 'Style', 'checkbox', 'Position', [10 (nf - k) * 20 + 4 W - 70 18], 'BackgroundColor', 'w', ...
                         'String', fmt{k, 2}, 'Value', ismember(fmt{k, 1}, s.export_formats));
 end
-util.buttonRow(fig, {'Export', 'Cancel the run'}, {@(~, ~) uiresume(fig), @(~, ~) cancelRun()}, W - 20, 14);
-cancelled = false;
+old = [dir(fullfile(testRoot, 'stress_stretch', '*.csv')); dir(fullfile(testRoot, 'stress_stretch', '*.xlsx'))];
+skipLabel = repmat({'Skip'}, 1, ~isempty(old));
+util.buttonRow(fig, [{'Export'}, skipLabel, {'Cancel'}], [{@(~, ~) uiresume(fig)}, repmat({@(~, ~) skipStep()}, 1, numel(skipLabel)), ...
+               {@(~, ~) cancelRun()}], W - 20, 14);
+cancelled = false; skip = false;
 uiwait(fig);
 if cancelled || ~isvalid(fig)
     if isvalid(fig), delete(fig); end
@@ -421,11 +438,13 @@ end
 defs = find(cell2mat(get(box, 'Value')))';
 formats = fmt(logical(cell2mat(get(fbox, 'Value'))), 1)';
 delete(fig);
-c('export_defs') = defs; c('export_formats') = formats; %#ok<NASGU> a handle: kept for the next test
-if isempty(defs) || isempty(formats)
-    util.log('-- export: nothing picked, only README.txt');
-else
-    util.log('-- export %s: %s', util.defList(defs), strjoin(formats, ', '));
+if ~skip
+    c('export_defs') = defs; c('export_formats') = formats; %#ok<NASGU> a handle: kept for the next test
+    if isempty(defs) || isempty(formats)
+        util.log('-- export: nothing picked, only README.txt');
+    else
+        util.log('-- export %s: %s', util.defList(defs), strjoin(formats, ', '));
+    end
 end
 
     function pick(k)
@@ -434,6 +453,11 @@ end
 
     function cancelRun()
         cancelled = true;
+        uiresume(fig);
+    end
+
+    function skipStep()
+        skip = true;
         uiresume(fig);
     end
 end

@@ -258,8 +258,8 @@ def overlay(rgb, rakes, tips_px, path):
 
 
 def show_tips(gray8, rakes, tips_px):
-    """The tips over the rest frame, with the question and its answers in the same window: "Yes, continue" or
-    "Click <RAKE> again" (closing the window answers "Yes, continue")."""
+    """The tips over the rest frame, with the question and its answers in the same window: "Continue" or
+    "Click <RAKE> again" (closing the window answers "Continue")."""
     fig = review.figure("runDIC: tine tips")
     ax = fig.add_axes([0.02, 0.15, 0.96, 0.78])
     ax.imshow(gray8, cmap="gray", vmin=0, vmax=255)
@@ -277,7 +277,7 @@ def show_tips(gray8, rakes, tips_px):
     fig.canvas.mpl_connect("scroll_event", lambda e: review.zoom(ax, e))
     return review.ask(fig, "Is every red circle on the tip of a tine? (The yellow rectangle joins the tips of "
                       "each rake.) If a rake's circles are off, click that rake again.",
-                      ["Yes, continue"] + [f"Click {s.upper()} again" for s in RAKES])
+                      ["Continue"] + [f"Click {s.upper()} again" for s in RAKES])
 
 
 def click_rake(gray8, side, near=None):
@@ -393,7 +393,7 @@ def main():
           f"max {max(moved):.0f} px); {kept} kept as detected or clicked")
     med = lambda side: int(round(float(np.median([t for _, t in rakes[side]["tips"]]))))  # noqa: E731
     tips_px = {"z": [med("left"), med("right")], "theta": [med("top"), med("bottom")]}
-    while review.enabled() and (answer := show_tips(gray8, rakes, tips_px)) != "Yes, continue":
+    while review.enabled() and (answer := show_tips(gray8, rakes, tips_px)) != "Continue":
         sd = answer.split()[1].lower()                     # "Click LEFT again"
         r = click_rake(gray8, sd, rakes[sd]["tips"])
         if r:

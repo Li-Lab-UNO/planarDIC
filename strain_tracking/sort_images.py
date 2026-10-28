@@ -265,7 +265,7 @@ def show(S, flag, root, dt, n_unassigned):
              "or many missing\nmeans the test or the folders need a look. Proceed with this test?")
     else:
         q = "Every folder has all its images, Data.csv rows and Coords1.csv rows. Proceed with this test?"
-    return review.ask(fig, q, ["Yes, proceed", "No, stop this test"])
+    return review.ask(fig, q, ["Proceed", "No, stop this test"])
 
 
 if __name__ == "__main__":

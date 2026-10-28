@@ -215,7 +215,7 @@ classdef util
         end
 
         function cancel(where)
-            % Stop the whole run (runDIC catches it): the user chose Cancel the run, or closed a question.
+            % Stop the whole run (runDIC catches it): the user chose Cancel, or closed a question.
             error('runDIC:cancelled', 'cancelled at %s', where);
         end
 
