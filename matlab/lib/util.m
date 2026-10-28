@@ -195,7 +195,7 @@ classdef util
 
         function centerRow(hs, xCenter)
             % Move a row of buttons (pixels) sideways so that it is centered on xCenter.
-            p = cell2mat(get(hs(:), 'Position'));
+            p = vertcat(hs.Position);
             dx = xCenter - (min(p(:, 1)) + max(p(:, 1) + p(:, 3))) / 2;
             for k = 1:numel(hs), set(hs(k), 'Position', p(k, :) + [dx 0 0 0]); end
         end

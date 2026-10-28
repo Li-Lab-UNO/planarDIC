@@ -201,7 +201,7 @@ res = finish();
         end
         shown = btn(1:size(B, 1));                    % one width, the widest label's, text on the left: a tidy column
         if ~isempty(shown)
-            p = cell2mat(get(shown(:), 'Position'));
+            p = vertcat(shown.Position);              % (get of one control returns no cell)
             for k = 1:numel(shown), set(shown(k), 'Position', [p(k, 1:2) max(p(:, 3)) p(k, 4)], 'HorizontalAlignment', 'left'); end
         end
         drawOverlays();

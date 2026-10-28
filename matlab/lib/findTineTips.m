@@ -344,9 +344,11 @@ if ~usejava('desktop')
 end
 if nargin < 5, near = []; end
 [H, W] = size(gray8);
+ax = gobjects(0);                                    % until made below (onMove can run first)
 fig = figure('Name', sprintf('Click the 5 tine tips of the %s rake', upper(name)), 'NumberTitle', 'off', ...
              'Color', 'w', 'WindowState', 'maximized', 'MenuBar', 'none', 'ToolBar', 'none', 'Pointer', 'crosshair', ...
-             'WindowScrollWheelFcn', @onScroll, 'KeyPressFcn', @onKey, 'CloseRequestFcn', @(~, ~) finish(false));
+             'WindowScrollWheelFcn', @onScroll, 'KeyPressFcn', @onKey, 'CloseRequestFcn', @(~, ~) finish(false), ...
+             'WindowButtonMotionFcn', @onMove);
 ax = axes(fig, 'Units', 'normalized', 'Position', [0.02 0.09 0.96 0.83]);
 hImg = imagesc(ax, gray8, [0 255]); colormap(ax, gray); axis(ax, 'image', 'off'); hold(ax, 'on');
 disableDefaultInteractivity(ax); ax.Toolbar.Visible = 'off';
@@ -407,6 +409,14 @@ R = struct('horizontal', hor, 'out', out, 'tips', round([c(:), t(:)]));
             case {'backspace', 'delete'}, undo();
             case {'return', 'enter'}, if numel(x) == 5, finish(true); end
         end
+    end
+
+    function onMove(~, ~)
+        % A crosshair over the image (set as the mouse moves: set once, macOS can miss it)
+        if isempty(ax) || ~isvalid(ax), return; end
+        p = ax.CurrentPoint(1, 1:2); xl = xlim(ax); yl = ylim(ax);
+        inside = p(1) >= xl(1) && p(1) <= xl(2) && p(2) >= yl(1) && p(2) <= yl(2);
+        set(fig, 'Pointer', util.ternary(inside, 'crosshair', 'arrow'));
     end
 
     function onScroll(~, evt)
