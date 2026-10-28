@@ -1,5 +1,5 @@
 function trackProtocols(testRoot, settings)
-% Track the deformations settings.track_deformations (Def01-Def19) against one common reference, the
+% Track the deformations settings.track_deformations (Def11-Def19 by default) against one common reference, the
 % first frame of the reference deformation. The grid covers the region between the rest-state tine-tip
 % lines; images are resampled to settings.target_px_per_mm, and the subset and grid step are set in mm.
 % Each deformation is first matched from the reference frame to its own first frame (the bridge), then

@@ -39,7 +39,7 @@ hOut = plot(ax, NaN, NaN, '-', 'Color', [1 0.6 0], 'LineWidth', 1.2, 'PickablePa
 hEx = plot(ax, NaN, NaN, '-', 'Color', [0.55 0.55 0.55], 'LineWidth', 0.8, 'PickableParts', 'none');
 hEdge = plot(ax, NaN, NaN, '.', 'Color', [1 0.2 0.2], 'MarkerSize', 6, 'PickableParts', 'none');
 hDone = plot(ax, NaN, NaN, '-', 'Color', [0.2 0.85 0.3], 'LineWidth', 0.6, 'PickableParts', 'none');
-hFrame = plot(ax, NaN, NaN, '--', 'Color', [1 0 0], 'LineWidth', 1.5, 'PickableParts', 'none');
+hFrame = plot(ax, NaN, NaN, '--', 'Color', [1 1 1], 'LineWidth', 1, 'PickableParts', 'none');   % the crop, once accepted
 hPrev = plot(ax, NaN, NaN, '--', 'Color', [1 0 0], 'LineWidth', 1.5, 'PickableParts', 'none');   % follows the cursor
 
 x0 = 0.72; w = 0.26;
@@ -205,6 +205,7 @@ res = finish();
             for k = 1:numel(shown), set(shown(k), 'Position', [p(k, 1:2) max(p(:, 3)) p(k, 4)], 'HorizontalAlignment', 'left'); end
         end
         drawOverlays();
+        drawnow                                       % a full redraw: what limitrate held back is cleared too
     end
 
     % ================================================================== actions

@@ -79,8 +79,9 @@ You can also give the folder directly, which runs the default steps without the 
 runDIC('C:\Data\N1900_LFPA\test1_10142026_PLC25_40-12')
 ```
 
-A test takes about 15 minutes on a recent 10-core computer, most of it tracking, and longer on a
-laptop with fewer cores. Progress is printed in the Command Window.
+A test (Def11–Def19 tracked) takes about 15 minutes on a recent 10-core computer, most of it tracking,
+and twice that with Def01–Def10 too; longer on a laptop with fewer cores. Progress is printed in the
+Command Window.
 
 ## What to check
 
@@ -287,7 +288,7 @@ folder marks the steps already done; pick the others. A tracking step that was i
 
 `DIC_settings.m` holds the settings, each explained in the file: the steps, the thickness, the
 deformations, the DIC sizes (in mm), the limits of the tracking report and how often the tracking
-progress line is updated. The defaults suit these tests. `track_deformations` (Def01–Def19) and
+progress line is updated. The defaults suit these tests. `track_deformations` (Def11–Def19) and
 `export_deformations` (Def11–Def19) fill in the tracking and export windows; `deformations`
 (Def11–Def19) are the ones shown in the tracking report.
 

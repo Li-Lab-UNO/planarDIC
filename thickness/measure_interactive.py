@@ -36,7 +36,7 @@ import testcfg  # noqa: E402
 DISPLAY_PX = 2000                       # displayed image size (px) for the whole photo
 UNITS = {"mm": 1.0, "cm": 10.0, "in": 25.4}
 RED, ORANGE, GRAY, GREEN = "#ff3333", "#ff9900", "#8c8c8c", "#33d94d"
-CLICK = "#ff0000"                # the clicks, the frame and the line following the cursor
+CLICK = "#ff0000"                # the clicks and the line following the cursor
 
 
 def photos_of(root):
@@ -90,7 +90,7 @@ class Measure:
         self.h_ex = line("-", color=GRAY, lw=0.8)
         self.h_edge = line(".", color=RED, ms=3)
         self.h_done = line("-", color=GREEN, lw=0.6)
-        self.h_frame = line("--", color=CLICK, lw=1.5)
+        self.h_frame = line("--", color="w", lw=1)                    # the crop, once accepted
         self.h_prev = line("--", color=CLICK, lw=1.5)                 # follows the cursor
         x0, w = self.x0, self.w = 0.68, 0.30                        # the panel on the right (layout() places it)
         self.t_title = fig.text(x0, 0.975, "", fontsize=11, weight="bold", va="top")

@@ -38,7 +38,7 @@ s.thickness_trim_mm = 0.5;
 % ---- deformations
 s.reference_deformation = 11;          % its first frame is the common reference of the stretches
 s.deformations = 11:19;                % analyzed: the CSVs and the tracking report
-s.track_deformations = 1:19;          % tracked; Def01-Def10 (preconditioning) only for the AllData file's rows
+s.track_deformations = 11:19;         % tracked (fills in the tracking window); 1:19 adds the preconditioning, only for the AllData file's rows
 s.calibration_deformations = [1 19];   % used for the image scale
 s.loading_only = true;                 % track each deformation only up to the end of its loading branch
 s.ask_tracking = true;                 % ask at the start which deformations to track, and loading only or the whole cycle (desktop only)
