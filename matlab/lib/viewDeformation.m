@@ -37,17 +37,18 @@ addlistener(slider, 'ContinuousValueChange', @(~, ~) onSlider());
 
 x0 = 0.78; w = 0.2;
 label(0.93, 'Deformation');
-popDef = uicontrol(fig, 'Style', 'popupmenu', 'Units', 'normalized', 'Position', [x0 0.89 w 0.04], ...
-                   'String', names, 'FontSize', 11, 'Callback', @(~, ~) loadDef());
-btnPlay = uicontrol(fig, 'Style', 'pushbutton', 'Units', 'normalized', 'Position', [x0 0.82 w * 0.48 0.05], ...
-                    'String', 'Play', 'FontSize', 12, 'Callback', @(~, ~) onPlay());
-popSpeed = uicontrol(fig, 'Style', 'popupmenu', 'Units', 'normalized', 'Position', [x0 + w * 0.52 0.82 w * 0.48 0.05], ...
-                     'String', compose('%dx real time', speeds), 'FontSize', 11);
-chkGrid = uicontrol(fig, 'Style', 'checkbox', 'Units', 'normalized', 'Position', [x0 0.76 w 0.04], ...
-                    'String', 'Grid lines', 'Value', 1, 'FontSize', 11, 'BackgroundColor', 'w', 'Callback', @(~, ~) draw());
-chkBad = uicontrol(fig, 'Style', 'checkbox', 'Units', 'normalized', 'Position', [x0 0.72 w 0.04], ...
-                   'String', 'Points (red: failed)', 'Value', 1, 'FontSize', 11, 'BackgroundColor', 'w', 'Callback', @(~, ~) draw());
-info = uicontrol(fig, 'Style', 'text', 'Units', 'normalized', 'Position', [x0 0.3 w 0.4], 'FontSize', 12, ...
+% the menus and Play as in MATLAB's own dialogs (pixels), placed by placeControls at the window's size
+popDef = uicontrol(fig, 'Style', 'popupmenu', 'Position', [0 0 200 22], 'String', names, 'Callback', @(~, ~) loadDef());
+btnPlay = util.button(fig, 'Pause', [0 0], @(~, ~) onPlay());   % sized for its longer label
+set(btnPlay, 'String', 'Play');
+popSpeed = uicontrol(fig, 'Style', 'popupmenu', 'Position', [0 0 120 22], 'String', compose('%dx real time', speeds));
+chkGrid = uicontrol(fig, 'Style', 'checkbox', 'Units', 'normalized', 'Position', [x0 0.79 w 0.03], ...
+                    'String', 'Grid lines', 'Value', 1, 'BackgroundColor', 'w', 'Callback', @(~, ~) draw());
+chkBad = uicontrol(fig, 'Style', 'checkbox', 'Units', 'normalized', 'Position', [x0 0.76 w 0.03], ...
+                   'String', 'Points (red: failed)', 'Value', 1, 'BackgroundColor', 'w', 'Callback', @(~, ~) draw());
+set(fig, 'SizeChangedFcn', @(~, ~) placeControls());
+placeControls();
+info = uicontrol(fig, 'Style', 'text', 'Units', 'normalized', 'Position', [x0 0.3 w 0.4], 'FontSize', 10, ...
                  'HorizontalAlignment', 'left', 'BackgroundColor', 'w', 'FontName', 'FixedWidth');
 uicontrol(fig, 'Style', 'text', 'Units', 'normalized', 'Position', [x0 0.04 w 0.24], 'FontSize', 10, ...
           'HorizontalAlignment', 'left', 'BackgroundColor', 'w', 'ForegroundColor', [0.35 0.35 0.35], 'String', { ...
@@ -65,6 +66,15 @@ if nargin > 2
     k = min(max(1, round(startFrame)), numel(trk.times)); set(slider, 'Value', k); draw();
 end
 
+
+    function placeControls()
+        % The menus and Play (pixels) at the window's current size: on opening (a maximized window gets
+        % its size only once shown) and whenever it is resized.
+        fp = getpixelposition(fig); X0 = round(x0 * fp(3));
+        set(popDef, 'Position', [X0 round(0.89 * fp(4)) round(w * fp(3)) 22]);
+        pb = get(btnPlay, 'Position'); set(btnPlay, 'Position', [X0 round(0.84 * fp(4)) pb(3:4)]);
+        set(popSpeed, 'Position', [X0 + pb(3) + 8, round(0.84 * fp(4)), 120, 22]);
+    end
 
     function loadDef()
         playing = false; set(btnPlay, 'String', 'Play');

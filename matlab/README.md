@@ -9,7 +9,8 @@ export. A tracking report shows the tracking of every protocol at the end.
 
 It runs on Windows, macOS and Linux with **MATLAB R2021a or later and no toolboxes**.
 
-For a first run, print `QUICKSTART.pdf`: every window in order, with screenshots and what to answer.
+For a first run, print `QUICKSTART.pdf`: every window in order, with screenshots and what to answer
+(its source, with the screenshots, is in `quickstart\`).
 
 ## Setting up (once)
 
@@ -41,25 +42,38 @@ In the MATLAB Command Window:
 runDIC
 ```
 
-A window asks for a folder. Choose a **test folder** to analyze that test, or a **sample folder** to
-analyze all its tests one after another. A second window then lists the steps, marks the ones already
-done, and runs the ones you pick (all of them the first time). Then a window asks for the **label** of
-each test (for example healthy) and **notes** (tears, re-mounting, anything unusual), filled in with
-what was saved before; they go into `test_config.json` and the results' `README.txt`. Then a window asks for the
-wall thickness of each test, typed or measured from the test's photos (see "Thickness"). With the
-`track` step, each test's images are sorted, its tine tips found and its image scale and tine spans
-measured first; then a window asks which of its deformations to track
-(the sorted folders Def01–Def19; "(tracked)" marks the ones already tracked) and whether to track the
-loading branch only (to the force peak; what the CSVs use) or the whole cycle. It is filled in with
-`track_deformations` and `loading_only`, and for the next test of a sample folder with the previous
-answer. With the `export` step, once the tracking
-is done, a window asks which deformations to export (Def11–Def19 by default; grayed out: not tracked) and which files to write:
-one CSV per protocol, all protocols in one CSV, the stress-stretch plot as PNG, PDF or MATLAB figure,
-and the AllData file (see "The results"); it is filled in with `export_deformations` and
-`export_formats`, and for the next test with the previous answer. The run waits for this answer; set
-`ask_export = false` to export the settings' choice without asking. The folder window opens where the
-folder of the last run is, also after MATLAB is restarted. You can also give the folder directly, which
-runs the default steps without the step window:
+A window asks for a folder: a **test folder** analyzes that test, a **sample folder** all its tests one
+after another. It opens where the folder of the last run is, also after MATLAB is restarted. Then the
+windows come in this order:
+
+1. **Steps**: the steps, with the ones already done marked; `runDIC` runs the ones you pick (all of them
+   the first time).
+2. **Label and notes** of each test (for example healthy; tears, re-mounting, anything unusual), filled
+   in with what was saved before. They go into `test_config.json` and the results' `README.txt`.
+3. **Thickness** of each test, typed or measured from the test's photos (see "Thickness").
+
+Then, for each test:
+
+4. **Sorted images**: the completeness check of the image folders (see "What to check").
+5. **Tine tips**: whether every red circle is on a tine tip (see "What to check"). The image scale and
+   the tine spans are then measured.
+6. **What to track**: which deformations (the sorted folders Def01–Def19; "(tracked)" marks the ones
+   tracked before) and whether to track the loading branch only (to the force peak; what the CSVs use)
+   or the whole cycle. It is filled in with `track_deformations` and `loading_only`, and for the next
+   test of a sample folder with the previous answer.
+7. **What to export**, once the tracking is done: which deformations (Def11–Def19 by default; grayed
+   out: not tracked) and which files (see "The results"). It is filled in with `export_deformations` and
+   `export_formats`, and for the next test with the previous answer. The run waits for this answer;
+   with `ask_export = false` the settings' choice is exported without asking.
+
+At the end, the tracking report of each test tracked opens (see "The tracking report").
+
+Every one of these windows has **Cancel**: it stops the whole run there, including the tests not yet
+started in a sample folder; closing a window does the same. Where a step's results already exist (tine
+tips, tracks, exported files), its window also has **Skip**: the step is left out for this test and the
+results saved before are kept. Tracking itself has no window; Ctrl-C in the Command Window stops it.
+
+You can also give the folder directly, which runs the default steps without the step window:
 
 ```matlab
 runDIC('C:\Data\N1900_LFPA\test1_10142026_PLC25_40-12')
@@ -77,13 +91,14 @@ rake positions) and rows of `Coords1.csv` (CellScale's 4 points), each a gap in 
 missing frames and whether they fall in loading or unloading (frames missing during unloading don't
 affect the exported loading curves). A few missing frames (up to about 5
 in a folder) are normal: the camera drops frames now and then. A folder with no images, or more
-missing, means the test or its folders need a look before going on. In a sample folder, "No, skip to
-the next test" stops this test and goes on with the others; "Cancel" stops the whole run. With
-one test, the choice is Proceed or Cancel. The table is saved as `Images\sort_summary.csv`.
+missing, means the test or its folders need a look before going on. **Proceed** goes on; in a sample
+folder, **No, skip to the next test** stops this test and goes on with the others. The table is saved as
+`Images\sort_summary.csv`.
 
 When the tine tips have been found, `runDIC` shows them and asks **whether every red circle is on the
-tip of a tine**, in one window: if a rake's circles are off, press its button ("Click LEFT again", ...)
-and click its tips (see below); the window then shows the tips again. "Continue" goes on.
+tip of a tine**, in one window. If a rake's circles are off, press its button ("Click LEFT again", ...)
+and click its tips (see below); the window then shows the tips again. **Continue** goes on; **Skip**
+(when the test has tine tips from before) keeps those.
 
 The loading branch of each deformation (the part exported) runs from the start of stretching, read
 from the tester's phase timing, to the force peak; it is found automatically.
@@ -117,9 +132,8 @@ deformations (Def11–Def19) side by side, each with the tracked points over the
 red: failed in that frame and filled in from the neighbors), every 4th grid row and column, and the
 stretches, the share of valid points and the match quality (ZNCC, 1 is a perfect match) of the frame
 shown. One slider moves all of them through their loading branch together; Play runs them. The
-preconditioning cycles (Def01–Def10) are tracked too, for the AllData file; they are not shown, but
-their numbers are in `DIC_results\tracking_report.csv` and the Command Window says if any of them
-tracked poorly.
+preconditioning cycles (Def01–Def10), when tracked, are not shown, but their numbers are in
+`DIC_results\tracking_report.csv` and the Command Window says if any of them tracked poorly.
 
 Each deformation is marked **Good**, **Check** (amber) or **Problem** (red) from its worst frame. If any
 is marked, the report opens at the worst frame of the worst one and says so at the top. A few red
@@ -144,12 +158,11 @@ The results are in the test's `stress_stretch` folder, the files picked in the e
 | `Def11_Equibiaxial.csv`, … `Def19_….csv` | the same, one file per protocol |
 | `stress_stretch.png`, `.pdf`, `.fig` | every protocol exported on one plot, to check the data at a glance (the `.fig` opens in MATLAB, to edit) |
 | `stress-stretch test<N>.AllData.xlsx` | the AllData file (below) |
-| `README.txt` | what the columns are; the label and notes, widths, thickness, scale, tracking verdict and any loading branches set by hand |
-| `stress-stretch test<N>.AllData.xlsx` | the loading branches of Def01–Def19 in CellScale's AllData layout (see below) |
+| `README.txt` | always written: the protocols exported, what the columns are; the label and notes, widths, thickness, scale, tracking verdict and any loading branches set by hand |
 
 Each row is one image frame of a **loading curve**, from the start of stretching to the peak. The
 stretches are relative to one reference state for every protocol: the first image of Def11. Def01–Def10
-are preconditioning and are only in the AllData file (below).
+are preconditioning; they are exported only when picked in the export window.
 
 | Column | Meaning |
 |---|---|
@@ -172,8 +185,9 @@ fitting; the CellScale and rake stretches are there for comparison.
 
 `stress-stretch test<N>.AllData.xlsx` (in `stress_stretch`) has the loading branch of every deformation
 exported (**All** in the export window gives Def01–Def19, preconditioning included, for checking), in
-the layout of CellScale's AllData export, one row per image frame. As in CellScale's export, each cycle is its own reference: the stretches are 1 and
-the forces are set to zero at the first frame of the cycle.
+the layout of CellScale's AllData export, one row per image frame. As in CellScale's export, each cycle
+is its own reference: the stretches are 1 and the forces are set to zero at the first frame of the
+cycle.
 
 | Columns | Meaning |
 |---|---|
@@ -194,8 +208,8 @@ start with one row per test, filled in with the thickness saved before. Type the
 example from the thickness workbook, or click **Measure from the photos** (below; the button is grayed out
 when the test has no photos). After measuring, the window comes back with the result in the test's box
 (yellow, with its spread and the thickness saved before beside it); **OK** saves it, and **Revert** puts
-that box back as it was. A typed value turns the box yellow too. A blank box, or a saved thickness left as it is, changes nothing; a test
-without a thickness has `NaN` stress columns. Without the `thickness` step, the window opens only for
+that box back as it was. A typed value turns the box yellow too. A blank box, or a saved thickness left
+as it is, changes nothing; a test without a thickness has `NaN` stress columns. Without the `thickness` step, the window opens only for
 tests that have no thickness. The thickness is saved in the test's `test_config.json`, with where it came
 from (`typed`, or the photos, strips and positions measured).
 
@@ -233,7 +247,7 @@ and crop another strip in this photo" crops the next one with the same scale. A 
 10 positions. The test's thickness is the mean of every position used, all strips of all photos
 together, and fills in the test's box in the thickness window when the last photo is done; closing the
 photo window instead leaves the box as it was. The positions, a summary per strip (with its
-frame) and a picture of each photo are saved in the test's `thickness` folder.
+crop) and a picture of each photo are saved in the test's `thickness` folder.
 
 ### Where the thickness is saved
 
@@ -260,13 +274,6 @@ The steps are, in order: `info`, `thickness`, `sort`, `tines`, `scale`, `widths`
 runDIC(folder, 'steps', {'track', 'export'})
 ```
 
-Each of these windows (label and notes, thickness, sorting, tine tips, tracking, export) has a **Cancel**
-button: it stops the whole run there, including the tests not yet started in a sample folder. Closing one
-of these windows does the same. Where a step's results already exist (tine tips, tracks, exported
-files), its window also has **Skip**: the step is left out for this test and the results saved before
-are kept. Tracking has no window; Ctrl-C in the Command Window
-stops it.
-
 Each step uses what the earlier ones wrote, so after changing something, run that step and the ones
 after it.
 
@@ -280,13 +287,15 @@ folder marks the steps already done; pick the others. A tracking step that was i
 
 `DIC_settings.m` holds the settings, each explained in the file: the steps, the thickness, the
 deformations, the DIC sizes (in mm), the limits of the tracking report and how often the tracking
-progress line is updated. The defaults suit these tests. `track_deformations` (Def01–Def19) are
-tracked; `deformations` (Def11–Def19) are analyzed: the CSVs and the tracking report.
+progress line is updated. The defaults suit these tests. `track_deformations` (Def01–Def19) and
+`export_deformations` (Def11–Def19) fill in the tracking and export windows; `deformations`
+(Def11–Def19) are the ones shown in the tracking report.
 
 `review_sort = false`, `review_tines = false`, `review_tracking = false`, `ask_thickness = false`,
-`ask_tracking = false` and `ask_export = false` turn off the sorting check, the tine-tip question, the tracking report window, the thickness window, the tracking window and the export window (the
-settings `track_deformations`, `loading_only`, `export_deformations` and `export_formats` are then used), for example when running many tests unattended;
-leave `info` and `thickness` out of the steps then too.
+`ask_tracking = false` and `ask_export = false` turn off the sorting check, the tine-tip window, the
+tracking report, the thickness window, the tracking window and the export window (the settings
+`track_deformations`, `loading_only`, `export_deformations` and `export_formats` are then used), for
+example when running many tests unattended; leave `info` and `thickness` out of the steps then too.
 
 The tracking needs about 1 GB of memory.
 
@@ -301,7 +310,7 @@ The tracking needs about 1 GB of memory.
 | `DIC_results\DefNN_….mat` | the DIC tracks (point positions in every frame) |
 | `DIC_results\*.png` | the pictures to check |
 | `DIC_results\tracking_report.csv` | tracking quality of every deformation (its verdict is also in `stress_stretch\README.txt`) |
-| `stress_stretch\` | the CSV files and the AllData file |
+| `stress_stretch\` | the files exported (CSV files, plot, AllData file) and `README.txt` |
 | `thickness\` | thickness measured from the photos: positions, summary per strip, a picture per photo |
 
 `test_config.json` and `scale_calibration.json` are the same files the Python version of this pipeline

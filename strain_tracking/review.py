@@ -143,14 +143,15 @@ def form(title, intro, fields, ok="Save", cancel="Cancel", width=11):
     from matplotlib.widgets import TextBox
     plt = pyplot()
     rows = len(fields)
-    fig = plt.figure(title, figsize=(width, 1.3 + 0.42 * rows), facecolor="w")
-    H = 1.3 + 0.42 * rows
+    row = 0.5                                              # in; Linux's fonts need more than macOS's
+    H = 1.5 + row * rows
+    fig = plt.figure(title, figsize=(width, H), facecolor="w")
     fig.text(0.02, 1 - 0.15 / H, intro, va="top", fontsize=TEXT_FONT, wrap=True)
     boxes = []
     for i, (label, initial) in enumerate(fields):
-        y = 1 - (0.6 + 0.42 * (i + 1)) / H
-        fig.text(0.02, y + 0.15 / H, label, va="center", fontsize=TEXT_FONT)
-        tb = TextBox(fig.add_axes([0.3, y, 0.68, BUTTON_H / H]), "", initial=initial or "")
+        y = 1 - (0.7 + row * (i + 1)) / H
+        fig.text(0.02, y + (BUTTON_H + 0.06) / 2 / H, label, va="center", fontsize=TEXT_FONT)
+        tb = TextBox(fig.add_axes([0.3, y, 0.68, (BUTTON_H + 0.06) / H]), "", initial=initial or "")
         tb.text_disp.set_fontsize(TEXT_FONT)
         boxes.append(tb)
     answer = [None]
