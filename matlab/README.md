@@ -299,7 +299,8 @@ example when running many tests unattended; leave `info` and `thickness` out of 
 
 The tracking needs about 1 GB of memory. On a computer with at least 16 cores and the Parallel Computing
 Toolbox, several deformations are tracked at once (half as many as the cores, each with its share of
-the cores, about 0.6 GB each); `use_parallel` and `parallel_workers` in `DIC_settings.m` change that.
+the processor's threads, about 0.6 GB each); `use_parallel`, `parallel_workers` and `parallel_threads`
+in `DIC_settings.m` change that.
 
 ## Files written
 

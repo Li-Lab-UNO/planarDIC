@@ -65,7 +65,7 @@ if usePar
     afterEach(q, @(m) util.log('%s', m));
     report = @(m, varargin) send(q, m);         % one line per update: no overwriting with several workers
     prm.progress_s = max(prm.progress_s, 30);
-    util.log('  tracking %d deformations, %d at a time, %d core(s) each', numel(jobs), nw, nt);
+    util.log('  tracking %d deformations, %d at a time, %d thread(s) each', numel(jobs), nw, nt);
     parfor i = 1:numel(jobs)
         maxNumCompThreads(nt);                   % a worker uses one core unless told otherwise
         trackOne(jobs{i}, ref, X0, prm, exclRes, meta, outDir, toNat, report);
@@ -121,7 +121,8 @@ end
 function [usePar, nw, nt] = parallelPlan(settings, nJobs)
 % Whether to track several deformations at once (settings.use_parallel: 'auto' does with the Parallel
 % Computing Toolbox and at least 16 cores), how many (settings.parallel_workers: 'auto' is half the cores,
-% at most one per deformation) and with how many cores each.
+% at most one per deformation) and with how many threads each (settings.parallel_threads: 'auto' shares
+% all the processor's threads, hyperthreads included, among the workers).
 cores = feature('numcores');
 mode = settings.use_parallel;
 if ischar(mode) || isstring(mode), usePar = cores >= 16; else, usePar = logical(mode); end
@@ -129,7 +130,18 @@ usePar = usePar && nJobs > 1 && canUseParallel();
 nw = settings.parallel_workers;
 if ischar(nw) || isstring(nw), nw = max(2, floor(cores / 2)); end
 nw = max(1, min(nw, nJobs));
-nt = max(1, floor(cores / nw));
+nt = settings.parallel_threads;
+if ischar(nt) || isstring(nt), nt = max(1, floor(logicalProcessors(cores) / nw)); end
+end
+
+
+function n = logicalProcessors(cores)
+% The processor's threads (2 per core with hyperthreading); the cores if that can't be read.
+n = cores;
+try
+    n = max(cores, java.lang.Runtime.getRuntime().availableProcessors());
+catch
+end
 end
 
 

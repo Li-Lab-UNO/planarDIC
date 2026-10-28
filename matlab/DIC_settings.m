@@ -69,5 +69,6 @@ s.review_tracking = true;              % open the tracking report at the end of 
 % of the cores, and needs about 0.6 GB.
 s.use_parallel = 'auto';               % 'auto': at once with the toolbox and at least 16 cores; true or false to choose
 s.parallel_workers = 'auto';           % deformations at once: 'auto' (half the cores, at most one per deformation) or a number
+s.parallel_threads = 'auto';           % threads per worker: 'auto' shares all the processor's threads (hyperthreads too), or a number
 s.progress_s = 1;                      % seconds between tracking progress updates (at least 30 with use_parallel)
 end
