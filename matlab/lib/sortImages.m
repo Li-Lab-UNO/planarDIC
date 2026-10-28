@@ -145,17 +145,17 @@ fig = figure('Name', 'runDIC: sorted images', 'NumberTitle', 'off', 'Color', 'w'
              'CloseRequestFcn', @(f, ~) util.answer(f, 'Cancel'));
 rows = [T.folder, num2cell(T.images), compose('%.1f', T.first_image_s), compose('%.1f', T.last_image_s), ...
         num2cell([T.images_missing, T.data_rows_missing, T.coords_rows_missing]), T.note];
-rows(flag, end) = strcat('<html><b><font color="red">', rows(flag, end), '</font></b></html>');
 cw = {190, 60, 75, 75, 70, 100, 100, 340};
 tbl = uitable(fig, 'Data', rows, 'ColumnName', {'Folder', 'Images', 'First|image (s)', 'Last|image (s)', 'Images|missing', ...
-        'Data.csv rows|missing', 'Coords1.csv|rows missing', 'Note'}, 'ColumnWidth', cw, 'RowName', []);
+        'Data.csv rows|missing', 'Coords1.csv|rows missing', 'Note'}, 'ColumnWidth', cw, 'RowName', [], ...
+        'RowStriping', 'on', 'BackgroundColor', rowColors(flag));   % rows with frames missing in red (no HTML: Linux shows its tags)
 tw = sum([cw{:}]) + 3; th = 44 + 23 * n;             % the table's own size (two-line header, rows): no empty space around it
 W = tw + 40;
 [~, tn] = fileparts(testRoot);
 info = [{sprintf(['%s: %d images, one every %.2f s; %d images outside every cycle (before the first or after ' ...
         'the last).'], strrep(tn, '_', ' '), sum(count), dt, nUnassigned)}; strcat(names(flag)', {': '}, note(flag))];
 if any(flag)
-    q = ['Some folders are missing frames (red). A few missing frames are fine (the camera drops frames now and then), ' ...
+    q = ['Some folders are missing frames (red rows). A few missing frames are fine (the camera drops frames now and then), ' ...
          'and frames missing during unloading don''t affect the loading curves; a folder with no images or many missing ' ...
          'means the test or the folders need a look. Proceed with this test?'];
 else
@@ -186,6 +186,14 @@ end
 end
 
 
+
+function c = rowColors(flag)
+% One background color per table row: light red where frames are missing, else white and light gray
+% stripes.
+c = repmat([1 1 1; 0.96 0.96 0.96], ceil(numel(flag) / 2), 1);
+c = c(1:numel(flag), :);
+c(flag, :) = repmat([1 0.8 0.8], nnz(flag), 1);
+end
 
 function h = fitText(hText, lines)
 % Wrap `lines` to the width of the text control and return the height (pixels) they take.

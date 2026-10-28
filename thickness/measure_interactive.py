@@ -35,7 +35,7 @@ import testcfg  # noqa: E402
 
 DISPLAY_PX = 2000                       # displayed image size (px) for the whole photo
 UNITS = {"mm": 1.0, "cm": 10.0, "in": 25.4}
-RED, ORANGE, GRAY, GREEN = "#e62626", "#ff9900", "#8c8c8c", "#33d94d"
+RED, ORANGE, GRAY, GREEN = "#ff3333", "#ff9900", "#8c8c8c", "#33d94d"
 CLICK = "#ff0000"                # the clicks, the frame and the line following the cursor
 
 
@@ -276,10 +276,13 @@ class Measure:
             y -= 0.085
         self.t_err.set_y(y)
         y -= 0.035
-        for b in self.buttons:
-            if b.ax.get_visible():
-                b.ax.set_position([x0, y - bh, min(w, review.button_width(b.label.get_text()) / W), bh])
-                y -= step
+        shown = [b for b in self.buttons if b.ax.get_visible()]
+        bw = min(w, max([review.button_width(b.label.get_text()) for b in shown], default=1) / W)
+        for b in shown:                               # one width, the widest label's, text on the left: a tidy column
+            b.ax.set_position([x0, y - bh, bw, bh])
+            b.label.set_horizontalalignment("left")
+            b.label.set_x(0.12 / (bw * W))
+            y -= step
         self.t_stat.set_y(y - 0.015)
         self.b_view.ax.set_position([x0, 0.15 / H, review.button_width("Back to the crop") / W, bh])
 

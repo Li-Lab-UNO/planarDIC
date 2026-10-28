@@ -55,9 +55,9 @@ meta = struct('X0', toNat(X0), 'shape', shape, 'step_px', step / f, 'radius', ra
     'reference', sprintf('%s t=%.1fs', refFolder, tRef(1)), 'mask_saturated', maskSat, 'exclude_px', excl);
 tAll = tic;
 exclRes = toRes(excl);
-if settings.use_parallel && canUseParallel()
+[usePar, nw, nt] = parallelPlan(settings, numel(jobs));
+if usePar
     pool = gcp('nocreate');
-    nw = min(settings.parallel_workers, numel(jobs));
     if isempty(pool) || pool.NumWorkers ~= nw
         delete(pool); parpool(nw);
     end
@@ -65,8 +65,9 @@ if settings.use_parallel && canUseParallel()
     afterEach(q, @(m) util.log('%s', m));
     report = @(m, varargin) send(q, m);         % one line per update: no overwriting with several workers
     prm.progress_s = max(prm.progress_s, 30);
-    util.log('  tracking %d deformations, %d at a time', numel(jobs), nw);
+    util.log('  tracking %d deformations, %d at a time, %d core(s) each', numel(jobs), nw, nt);
     parfor i = 1:numel(jobs)
+        maxNumCompThreads(nt);                   % a worker uses one core unless told otherwise
         trackOne(jobs{i}, ref, X0, prm, exclRes, meta, outDir, toNat, report);
     end
 else
@@ -114,6 +115,21 @@ roi = zeros(1, 4);
         x0 = round(a + ((b - a) - n * step) / 2);
         x1 = x0 + n * step;
     end
+end
+
+
+function [usePar, nw, nt] = parallelPlan(settings, nJobs)
+% Whether to track several deformations at once (settings.use_parallel: 'auto' does with the Parallel
+% Computing Toolbox and at least 16 cores), how many (settings.parallel_workers: 'auto' is half the cores,
+% at most one per deformation) and with how many cores each.
+cores = feature('numcores');
+mode = settings.use_parallel;
+if ischar(mode) || isstring(mode), usePar = cores >= 16; else, usePar = logical(mode); end
+usePar = usePar && nJobs > 1 && canUseParallel();
+nw = settings.parallel_workers;
+if ischar(nw) || isstring(nw), nw = max(2, floor(cores / 2)); end
+nw = max(1, min(nw, nJobs));
+nt = max(1, floor(cores / nw));
 end
 
 

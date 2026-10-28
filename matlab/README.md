@@ -87,7 +87,7 @@ laptop with fewer cores. Progress is printed in the Command Window.
 After the images are sorted, `runDIC` shows a table of the folders Def01–Def19 with the number of
 images in each and the frames missing from the tester's files: images, rows of `Data.csv` (forces,
 rake positions) and rows of `Coords1.csv` (CellScale's 4 points), each a gap in their times. It then
-**asks whether to proceed**. Folders missing anything are marked red; the note gives the times of the
+**asks whether to proceed**. Folders missing anything have a red row; the note gives the times of the
 missing frames and whether they fall in loading or unloading (frames missing during unloading don't
 affect the exported loading curves). A few missing frames (up to about 5
 in a folder) are normal: the camera drops frames now and then. A folder with no images, or more
@@ -297,7 +297,9 @@ tracking report, the thickness window, the tracking window and the export window
 `track_deformations`, `loading_only`, `export_deformations` and `export_formats` are then used), for
 example when running many tests unattended; leave `info` and `thickness` out of the steps then too.
 
-The tracking needs about 1 GB of memory.
+The tracking needs about 1 GB of memory. On a computer with at least 16 cores and the Parallel Computing
+Toolbox, several deformations are tracked at once (half as many as the cores, each with its share of
+the cores, about 0.6 GB each); `use_parallel` and `parallel_workers` in `DIC_settings.m` change that.
 
 ## Files written
 

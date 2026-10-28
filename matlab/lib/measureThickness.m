@@ -34,10 +34,10 @@ axis(ax, 'image', 'off'); hold(ax, 'on');
 disableDefaultInteractivity(ax); ax.Toolbar.Visible = 'off';
 set(ax, 'ButtonDownFcn', @onClick);      % overlays let clicks through (PickableParts none); the axes catch the rest
 hLine = plot(ax, NaN, NaN, '-o', 'Color', [1 0 0], 'MarkerFaceColor', [1 0 0], 'MarkerEdgeColor', 'w', 'LineWidth', 2, 'PickableParts', 'none');   % the clicks
-hOk = plot(ax, NaN, NaN, '-', 'Color', [0.9 0.15 0.15], 'LineWidth', 0.8, 'PickableParts', 'none');
+hOk = plot(ax, NaN, NaN, '-', 'Color', [1 0.2 0.2], 'LineWidth', 0.8, 'PickableParts', 'none');
 hOut = plot(ax, NaN, NaN, '-', 'Color', [1 0.6 0], 'LineWidth', 1.2, 'PickableParts', 'none');
 hEx = plot(ax, NaN, NaN, '-', 'Color', [0.55 0.55 0.55], 'LineWidth', 0.8, 'PickableParts', 'none');
-hEdge = plot(ax, NaN, NaN, '.', 'Color', [0.9 0.15 0.15], 'MarkerSize', 6, 'PickableParts', 'none');
+hEdge = plot(ax, NaN, NaN, '.', 'Color', [1 0.2 0.2], 'MarkerSize', 6, 'PickableParts', 'none');
 hDone = plot(ax, NaN, NaN, '-', 'Color', [0.2 0.85 0.3], 'LineWidth', 0.6, 'PickableParts', 'none');
 hFrame = plot(ax, NaN, NaN, '--', 'Color', [1 0 0], 'LineWidth', 1.5, 'PickableParts', 'none');
 hPrev = plot(ax, NaN, NaN, '--', 'Color', [1 0 0], 'LineWidth', 1.5, 'PickableParts', 'none');   % follows the cursor
@@ -51,7 +51,7 @@ txtIns = uicontrol(fig, 'Style', 'text', 'Units', 'normalized', 'Position', [x0 
 lblSize = uicontrol(fig, 'Style', 'text', 'Position', [0 0 40 16], 'String', 'Size', ...
                     'FontSize', 10, 'HorizontalAlignment', 'left', 'BackgroundColor', 'w');
 edtSize = uicontrol(fig, 'Style', 'edit', 'Position', [0 0 70 22], ...
-                    'String', sq.value, 'Callback', @(~, ~) set(txtErr, 'String', ''));
+                    'String', sq.value, 'Callback', @(~, ~) clearError());   % txtErr is made below
 popUnit = uicontrol(fig, 'Style', 'popupmenu', 'Position', [0 0 70 22], ...
                     'String', units, 'Value', max(1, find(strcmp(units, sq.unit), 1)));
 txtErr = uicontrol(fig, 'Style', 'text', 'Units', 'normalized', 'Position', [x0 0.575 w 0.035], 'FontSize', 10, ...
@@ -91,6 +91,10 @@ res = finish();
         small = rgb(1:ds:end, 1:ds:end, :);
         wholePhoto();
         setState('scale1');
+    end
+
+    function clearError()
+        set(txtErr, 'String', '');
     end
 
     function placePanel()
@@ -194,6 +198,11 @@ res = finish();
             else
                 set(btn(k), 'Visible', 'off');
             end
+        end
+        shown = btn(1:size(B, 1));                    % one width, the widest label's, text on the left: a tidy column
+        if ~isempty(shown)
+            p = cell2mat(get(shown(:), 'Position'));
+            for k = 1:numel(shown), set(shown(k), 'Position', [p(k, 1:2) max(p(:, 3)) p(k, 4)], 'HorizontalAlignment', 'left'); end
         end
         drawOverlays();
     end
@@ -506,7 +515,7 @@ res = finish();
         lab = {};
         for k = 1:numel(pl)
             Sk = pl{k}.S; u = Sk.ok & ~Sk.outlier & ~Sk.removed;
-            [cxs, cys] = chords(Sk, u); plot(a, cxs, cys, '-', 'Color', [0.9 0.15 0.15], 'LineWidth', 0.5);
+            [cxs, cys] = chords(Sk, u); plot(a, cxs, cys, '-', 'Color', [1 0.2 0.2], 'LineWidth', 0.5);
             text(a, Sk.x(1), Sk.y(1), sprintf(' %d', pl{k}.strip), 'Color', 'y', 'FontSize', 14, 'FontWeight', 'bold');
             lab{end + 1} = sprintf('strip %d: %.3f +- %.3f mm (n = %d)', pl{k}.strip, mean(Sk.thickness_mm(u)), ...
                                    std(Sk.thickness_mm(u)), sum(u)); %#ok<AGROW>

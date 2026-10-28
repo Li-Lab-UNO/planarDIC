@@ -62,10 +62,12 @@ s.tracking_problem = [80 0.90];
 s.review_tracking = true;              % open the tracking report at the end of a run that tracked (desktop only)
 
 % ---- computing
-% MATLAB already uses every CPU core for the matching, so deformations are tracked one after another by
-% default (about 13 min for the 19 deformations of a test on a 10-core computer; tracking several at
-% once was slower there).
-s.use_parallel = false;                % true: track several deformations at once (Parallel Computing Toolbox)
-s.parallel_workers = 4;                % deformations tracked at once with use_parallel; about 0.6 GB each
+% MATLAB's matching already uses several CPU cores, so on a computer with up to about 10 cores the
+% deformations are tracked one after another (about 13 min for the 19 deformations of a test on a 10-core
+% computer; tracking several at once was slower there). With more cores, several deformations are tracked
+% at once, which needs the Parallel Computing Toolbox: each worker tracks one deformation with its share
+% of the cores, and needs about 0.6 GB.
+s.use_parallel = 'auto';               % 'auto': at once with the toolbox and at least 16 cores; true or false to choose
+s.parallel_workers = 'auto';           % deformations at once: 'auto' (half the cores, at most one per deformation) or a number
 s.progress_s = 1;                      % seconds between tracking progress updates (at least 30 with use_parallel)
 end
