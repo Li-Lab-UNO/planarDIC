@@ -15,7 +15,7 @@ The code and the settings files come from the git repository; the data does not 
 sample folders). Install git, the GitHub tool and Python's venv module, sign in, and clone:
 
 ```bash
-sudo apt install git gh python3-venv
+sudo apt install git gh python3-venv python3-tk
 ```
 ```bash
 gh auth login
@@ -65,10 +65,9 @@ From here on, `--test N1900/test1` (or just `N1900` for all its tests) selects t
 start of the folder names works.
 
 Nothing else is needed: the pipeline derives every setting from these files. The tine tips and glint
-masking come from the images, the thickness from the photos in `Thickness, 1900/test 1` (the sample's
-workbook where the photos give none, or with `thickness = workbook` in `runDIC.ubuntu.ini`), excluded tine
-pairs from the calibration's outlier rule, and excluded regions from the artifact check. Only the label
-is yours to give (`--label`). A `test_config.json` that is already there is kept and updated, so
+masking come from the images, excluded tine pairs from the calibration's outlier rule, and excluded regions
+from the artifact check. Yours to give are the label and notes (a window, step 3) and the thickness,
+measured from the photos in `Thickness, 1900/test 1` in a window (step 5). A `test_config.json` that is already there is kept and updated, so
 settings entered by hand override the rules.
 
 ---
@@ -83,23 +82,39 @@ This prints every command without running anything.
 
 ---
 
-## 3. Sort the images and draft `test_config.json`
+## 3. Sort the images, draft `test_config.json` and check the loading branches
 
 ```bash
-./runDIC.sh --steps sort,config --label "labeled healthy" N1900/test1
+./runDIC.sh --steps info,sort,config,branches N1900/test1
 ```
 
-- **sort** moves the images into 19 folders, `Def01_Preconditioning_c01` … `Def19_Equibiaxial_Save`
-  (`Images/sort_manifest.csv` records every move). Safe to rerun.
+- **info** asks for the test's label (healthy, or slightly calcified) and notes (tears, re-mounting,
+  anything unusual), filled in with what is saved; they go into `test_config.json`.
+- **sort** moves the images into 19 folders, `Def01_Preconditioning_c01` … `Def19_Equibiaxial`
+  (`Images/sort_manifest.csv` records every move). Safe to rerun. A window then lists every folder with
+  its images and the frames missing from the tester's files (images, `Data.csv` rows, `Coords1.csv`
+  rows); folders missing anything are red, with the times of the missing frames and whether they fall in
+  loading or unloading (frames missing during unloading don't affect the loading curves). A few missing frames (up to about 5 in a folder) are normal:
+  click **Yes, proceed**. A folder with no images, or more missing, needs a look: **No, stop this test**
+  skips its later steps. The table is saved as `Images/sort_summary.csv`.
 - **config** finds the 20 tine tips in the first Def11 image, refines them, and writes `test_config.json`
   with the tip lines, the label and a glint check. With an existing config it updates only the tine
-  settings and keeps everything else.
+  settings and keeps everything else. A window shows the tips: if a red circle is off its tine tip,
+  answer **No, fix some rakes**, tick the rakes and click their 5 tips (the end of each rod, where it
+  meets the tissue; scroll to zoom, right-click or Backspace removes the last click). The clicks are
+  refined automatically. A rake the tip finder can't find (`SELF-CHECK FAILED` in the log) is asked for
+  the same way.
 
-Open `DIC_results/config_tine_tips.png` and check that every red circle sits on a
-tine tip. If the step failed with `SELF-CHECK FAILED`, the message names the rake. Copy a config from
-another test, enter that rake's tines by hand (open the image in GIMP, `sudo apt install gimp`, which
-shows the pixel position under the mouse; within about 20 px is enough), and rerun the step: it
-refines them.
+- **branches** shows the rake forces of Def11–Def19 with each loading branch shaded: from the start of
+  stretching to the force peak. Each band should start where the forces begin to rise and end at their
+  peak. If one doesn't, answer **No, fix some**, tick the protocols and click where loading starts and
+  where it ends (A goes back to the automatic branch). Branches set by hand go to `loading_branches.json`,
+  and `--loading-only` tracking and the fits use them. The branches are also drawn in
+  `DIC_results/loading_branches.png`.
+
+The tips are also saved in `DIC_results/config_tine_tips.png`. `--no-review` runs the steps without
+the windows; a failed self-check then stops the step, and the rake's tips are entered by hand in
+`test_config.json` (within about 20 px; the step refines them when run again):
 
 | Rake | `horizontal` | `out` | Each tine is written as |
 |---|---|---|---|
@@ -125,21 +140,18 @@ percent (right panel). To choose the pairs yourself, add them to the config, for
 
 ## 5. Thickness
 
-The thickness is needed only for the stresses (step 8), but it runs here, before tracking, so its overlays
-can be checked while tracking runs; it needs only the photos and the test's config. The pipeline's
-`thickness` step measures the photos in `Thickness, 1900/test <N>` and writes `thickness_mm` into each
-test's config, in place of the workbook value (`thickness = auto` in `runDIC.ubuntu.ini`), or only where
-the workbook gives none (`thickness = workbook`, or `--thickness workbook` for one run). Its log lists the photos used and those left out, with the reason.
-To run it on its own:
-
 ```bash
-./runDIC.sh --steps thickness N1900
+./runDIC.sh --steps thickness N1900/test1
 ```
 
-Check the overlays in `Thickness, 1900/thickness_auto/test<N>/`: the yellow outline should follow the tissue
-around every strip, and every strip marked `*` (all, by default) should be a piece of the test's specimen
-(`strip_selection.json` in the photo folder can use one strip of a photo, or leave a photo out). See
-"Thickness from photos" in `README.md`.
+A window opens on the first photo in `Thickness, 1900/test 1`. For each photo: click across one square of
+the mat and type its size (0.5 in; remembered), then click a long line between two grid lines (the squares
+are counted for you), frame the strip, and click along its middle; the edges are found automatically.
+Check that the red chords run from edge to edge, and fix them if not (remove a section, redraw the
+centerline, or click the edges yourself). The thickness is the mean over every position used, saved in
+`test_config.json` (`thickness_mm`) with the test's `thickness/` folder (positions, a summary and an overlay
+per photo). A test that already has a thickness is asked whether to keep it; a test without photos gets
+a box to type one (from the thickness workbook, for example). See "Thickness from photos" in `README.md`.
 
 ---
 
@@ -203,13 +215,15 @@ and 95% intervals) and `fit_stress_stretch_<input>.png` (data and model, every p
 ## Everything at once (steps 3–8)
 
 ```bash
-./runDIC.sh --label "labeled healthy" N1900
+./runDIC.sh N1900
 ```
 
-It asks before starting (`--yes` skips the question), writes logs to `DIC_logs/run_<date>_<time>/`
-in each test folder, and ends with a summary that includes each test's fit (R² and RMSE). Check
-`config_tine_tips.png` and `scale_calibration.png`, the thickness overlays (ready about two minutes in,
-while tracking runs) and the fit plots.
+It asks before starting (`--yes` skips the question), shows the windows of steps 3 and 5 for each test in
+turn (label and notes, sorting, tine tips, loading branches, thickness), then runs the rest without asking
+(except the tracking report of each test, after tracking and before its figures and fit: a test with a
+deformation marked Check or Problem can be stopped there; `view_tracking.py --test SAMPLE/testN` opens the
+report again), writes logs to `DIC_logs/run_<date>_<time>/` in each test folder, and ends with a summary that
+includes each test's fit (R² and RMSE). Check `scale_calibration.png` and the fit plots.
 
 To see what each test has:
 

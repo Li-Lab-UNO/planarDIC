@@ -10,7 +10,7 @@ Stress: t_zz = (F_z - F_z0) lambda_z / (w_theta H),  t_tt = (F_t - F_t0) lambda_
   F_z0, F_t0: force at the start of each protocol (load-cell offset at rest).
   w_theta, w_z: tine-span widths (default) or full specimen widths (--width specimen).
 Data: loading frames of each protocol, from the Stretch start to the rake peak
-(compare_stretch_inputs.loading_end).
+(compare_stretch_inputs.loading_end), or as set by hand in loading_branches.json (review_branches.py).
 Fit: multi-start least squares for the global minimum, then nonparametric bootstrap
 (resample frames, refit) as in Jadidi et al. 2019. Also a gamma profile and the
 linearized parameter correlations.
@@ -23,6 +23,7 @@ import argparse
 import glob
 import json
 import os
+import re
 import sys
 
 import matplotlib
@@ -78,6 +79,8 @@ def load_data(sets, width):
         rc = ph[(ph.Set == s) & (ph.Phase == "Recover")].iloc[0]
         t0 = float(st["StartTime(s)"])
         t1 = loading_end(Dd, t0, float(rc["StartTime(s)"]))          # rake peak, not the logged boundary
+        n = int(np.nonzero(ph[ph.Phase == "Stretch"].Set.to_numpy() == s)[0][0]) + 1   # DefNN
+        t0, t1 = D.branch_by_hand(TEST_ROOT, f"Def{n:02d}") or (t0, t1)  # set by hand (review_branches.py)
         idx = np.nonzero((tC >= t0 - 1e-6) & (tC <= t1 + 1e-6))[0]
         if ref is None:
             ref = P[idx[0]]
@@ -87,7 +90,7 @@ def load_data(sets, width):
             E = D.green_lagrange(D.bilinear_F_center(ref, P[i]))
             lz, lt = np.sqrt(1 + 2 * E[0, 0]), np.sqrt(1 + 2 * E[1, 1])
             fz, ft = d.X_Force_mN.iloc[j] - fz0, d.Y_Force_mN.iloc[j] - ft0
-            rows.append(dict(set=s, name=st.SetName.replace(" save cycle", "").replace(" save cyle", ""),
+            rows.append(dict(set=s, name=re.sub(r"\s+save\s+cyc?le$", "", st.SetName, flags=re.I),
                              t=tC[i], lz=lz, lt=lt, Ezt=E[0, 1], fz=fz, ft=ft, fz0=fz0, ft0=ft0,
                              tzz_per_H=fz * lz / w_t, ttt_per_H=ft * lt / w_z))
     return pd.DataFrame(rows)

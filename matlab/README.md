@@ -45,8 +45,18 @@ A window asks for a folder. Choose a **test folder** to analyze that test, or a 
 analyze all its tests one after another. A second window then lists the steps, marks the ones already
 done, and runs the ones you pick (all of them the first time). Then a window asks for the **label** of
 each test (for example healthy) and **notes** (tears, re-mounting, anything unusual), filled in with
-what was saved before; they go into `test_config.json` and the results' `README.txt`. Then the wall
-thickness is measured from the test's photos (see "Thickness"). The folder window opens where the
+what was saved before; they go into `test_config.json` and the results' `README.txt`. Then a window asks for the
+wall thickness of each test, typed or measured from the test's photos (see "Thickness"). With the
+`track` step, each test's images are sorted and its tine tips found first; then a window asks which of its deformations to track
+(the sorted folders Def01–Def19; "(tracked)" marks the ones already tracked) and whether to track the
+loading branch only (to the force peak; what the CSVs use) or the whole cycle. It is filled in with
+`track_deformations` and `loading_only`, and for the next test of a sample folder with the previous
+answer. It comes after the sorting check and the tine tips. With the `export` step, once the tracking
+is done, a window asks which deformations to export (Def11–Def19 by default; grayed out: not tracked) and which files to write:
+one CSV per protocol, all protocols in one CSV, the stress-stretch plot as PNG, PDF or MATLAB figure,
+and the AllData file (see "The results"); it is filled in with `export_deformations` and
+`export_formats`, and for the next test with the previous answer. The run waits for this answer; set
+`ask_export = false` to export the settings' choice without asking. The folder window opens where the
 folder of the last run is, also after MATLAB is restarted. You can also give the folder directly, which
 runs the default steps without the step window:
 
@@ -62,27 +72,25 @@ laptop with fewer cores. Progress is printed in the Command Window.
 After the images are sorted, `runDIC` shows a table of the folders Def01–Def19 with the number of
 images in each and the frames missing from the tester's files: images, rows of `Data.csv` (forces,
 rake positions) and rows of `Coords1.csv` (CellScale's 4 points), each a gap in their times. It then
-**asks whether to proceed**. Folders missing anything are marked red. A few missing frames (up to about 5
+**asks whether to proceed**. Folders missing anything are marked red; the note gives the times of the
+missing frames and whether they fall in loading or unloading (frames missing during unloading don't
+affect the exported loading curves). A few missing frames (up to about 5
 in a folder) are normal: the camera drops frames now and then. A folder with no images, or more
-missing, means the test or its folders need a look before going on. "No, stop this test" stops that test only. The table is saved as
-`Images\sort_summary.csv`.
+missing, means the test or its folders need a look before going on. In a sample folder, "No, skip to
+the next test" stops this test and goes on with the others; "Cancel the run" stops the whole run. With
+one test, only "Cancel the run" is offered. The table is saved as `Images\sort_summary.csv`.
 
 When the tine tips have been found, `runDIC` shows them and asks **whether every red circle is on the
-tip of a tine**. If not, answer "No, fix some rakes", pick the rakes that are wrong and click their tips
-(see below).
+tip of a tine**, in one window: if a rake's circles are off, press its button ("Click LEFT again", ...)
+and click its tips (see below); the window then shows the tips again. "Yes, continue" goes on.
 
-Next, `runDIC` shows the rake forces of Def11–Def19 with each **loading branch** shaded: the part
-exported, from the start of stretching to the force peak. Each band should start where the forces
-begin to rise and end at their peak. If one doesn't, answer "No, fix some", pick the protocols and click
-where loading starts and where it ends; a right-click (or Backspace) removes the last click, and A goes
-back to the automatic branch. The run then proceeds by itself.
+The loading branch of each deformation (the part exported) runs from the start of stretching, read
+from the tester's phase timing, to the force peak; it is found automatically.
 
 After a run, look at the pictures in the test's `DIC_results` folder:
 
 - **`config_tine_tips.png`**: every red circle should sit on the tip of a tine, and the yellow
   rectangle should join the tips.
-- **`loading_branches.png`**: the loading branches of all 19 deformations (Def01–Def10 are only shown,
-  not asked about; red: set by hand).
 - **`scale_calibration.png`**: in the right panel, the tine pairs should agree within a few percent.
   Pairs that disagree are left out automatically and listed in the Command Window.
 - **`artifact_check.png`**: local tracking errors. A speckle particle sliding over the tissue or a
@@ -92,8 +100,9 @@ After a run, look at the pictures in the test's `DIC_results` folder:
 
 If the tine tips can't be found automatically on one side, `runDIC` shows the image and asks you to
 **click the 5 tine tips of that rake**. Click the end of each rod, where it meets the tissue; a red
-circle marks each click, and a right-click (or Backspace) removes the last one. The clicks are refined
-automatically. If the tips were found but some red circles are off, click all 20 yourself and redo the
+cross marks each click, and a right-click (or Backspace) removes the last one. The window opens zoomed on
+the rake; scroll to zoom further where the pointer is, and **Done** (or Enter) takes the 5 clicks, which
+are kept as clicked. If the tips were found but some red circles are off, click all 20 yourself and redo the
 later steps:
 
 ```matlab
@@ -126,13 +135,14 @@ viewTracking
 
 ## The results
 
-The results are in the test's `stress_stretch` folder:
+The results are in the test's `stress_stretch` folder, the files picked in the export window:
 
 | File | Contents |
 |---|---|
-| `all_protocols.csv` | every loading curve, one row per image frame |
+| `all_protocols.csv` | every loading curve exported, one row per image frame |
 | `Def11_Equibiaxial.csv`, … `Def19_….csv` | the same, one file per protocol |
-| `stress_stretch.png` | every protocol on one plot, to check the data at a glance |
+| `stress_stretch.png`, `.pdf`, `.fig` | every protocol exported on one plot, to check the data at a glance (the `.fig` opens in MATLAB, to edit) |
+| `stress-stretch test<N>.AllData.xlsx` | the AllData file (below) |
 | `README.txt` | what the columns are; the label and notes, widths, thickness, scale, tracking verdict and any loading branches set by hand |
 | `stress-stretch test<N>.AllData.xlsx` | the loading branches of Def01–Def19 in CellScale's AllData layout (see below) |
 
@@ -159,9 +169,9 @@ fitting; the CellScale and rake stretches are there for comparison.
 
 ### The AllData file
 
-`stress-stretch test<N>.AllData.xlsx` (in `stress_stretch`) has the loading branch of every deformation,
-Def01–Def19 (preconditioning included, for checking), in the layout of CellScale's AllData export, one
-row per image frame. As in CellScale's export, each cycle is its own reference: the stretches are 1 and
+`stress-stretch test<N>.AllData.xlsx` (in `stress_stretch`) has the loading branch of every deformation
+exported (**All** in the export window gives Def01–Def19, preconditioning included, for checking), in
+the layout of CellScale's AllData export, one row per image frame. As in CellScale's export, each cycle is its own reference: the stretches are 1 and
 the forces are set to zero at the first frame of the cycle.
 
 | Columns | Meaning |
@@ -178,11 +188,15 @@ this file unchanged.
 
 ## Thickness
 
-The stresses need the wall thickness. The step `thickness`, selected by default, measures it from the
-test's photos (below); when the test already has a thickness, it first asks whether to keep it or
-measure again. For a test without photos, `runDIC` opens a window at the start to type the thickness
-(mm); leave it blank to skip that test (its stress columns are then `NaN`). The thickness is saved in
-the test's `test_config.json`, with where it came from.
+The stresses need the wall thickness. The step `thickness`, selected by default, opens a window at the
+start with one row per test, filled in with the thickness saved before. Type the thickness (mm), for
+example from the thickness workbook, or click **Measure from the photos** (below; the button is grayed out
+when the test has no photos). After measuring, the window comes back with the result in the test's box
+(yellow, with its spread and the thickness saved before beside it); **OK** saves it, and **Revert** puts
+that box back as it was. A typed value turns the box yellow too. A blank box, or a saved thickness left as it is, changes nothing; a test
+without a thickness has `NaN` stress columns. Without the `thickness` step, the window opens only for
+tests that have no thickness. The thickness is saved in the test's `test_config.json`, with where it came
+from (`typed`, or the photos, strips and positions measured).
 
 ### Measuring from the photos
 
@@ -190,31 +204,34 @@ The photos of a test's strips, lying on their cut face on the blue cutting mat o
 in the sample folder's `Thickness, <ID>\test <N>` folder (for example `Thickness, 1900\test 1`). Each
 photo is opened in turn; scroll to zoom where the pointer is.
 
-1. **Scale, part 1.** Click on one grid line and then on the next one, straight across one square (or
-   across one ruler tick), and type the size of that square with its unit (a mat square is 0.5 in). The
-   size is remembered for the next photo.
-2. **Scale, part 2.** Click on a grid line and then on another one as far away as the photo allows,
-   close to the strip. The squares in between are counted for you; confirm the count. If the ends are
-   not on grid lines, you are asked to draw the line again.
-3. **Frame the strip.** Click two opposite corners of a box around the strip to measure; the view then
-   stays on it ("Back to the frame" returns to it). Measure complete strips only and leave out pieces
-   cut off by the edge of the photo. "No frame" keeps the whole photo.
-4. **Centerline.** Click along the middle of a strip, end to end (two clicks for a straight strip, more
-   where it bends), and press Done. The edges are found automatically.
-5. **Check.** The strip is shown with a red line across it at every position measured, edge to edge.
+1. **Scale, 1 grid spacing.** Click on one grid line and then on the next one, straight across one grid
+   spacing (or one ruler tick), and type the size of that spacing with its unit (a mat square is
+   0.5 in). The size is remembered for the next photo.
+2. **Scale check.** Click on a grid line near the strip and then on another one as far away as the
+   photo allows. The grid spacings between the two clicks are counted with the spacing from step 1 and
+   shown with the scale they give; press Confirm. This longer line sets the scale (a click's error
+   matters less over a longer line), and checks step 1: if the count is not a whole number, a click is
+   off a grid line, and the line has to be drawn again (or step 1 redone with Back).
+3. **Crop.** Click two opposite corners of an ROI around the strip; the view then stays on it ("Back to
+   the crop" returns to it). Crop whole strips only and leave out pieces cut off at the edge of the
+   photo. "No crop" keeps the whole photo.
+4. **Trace the centerline.** Click along the middle of the strip from one end to the other, and press
+   Done. The edges are found automatically.
+5. **Check the thickness measurements.** The strip is shown with a red line across it at every position
+   measured, edge to edge.
    If the red lines end on the edges of the strip, use the strip. Orange positions are far from the
    rest (a loose fiber, a cut end) and are left out automatically. Otherwise: **Remove a section** (click
    its two ends), **Redraw the centerline**, **Click the edges myself** (click along one edge, then the
    other), or **Skip this strip**.
 
-The cursor is a crosshair over the photo. A double-click (or Enter) on the last point of a step proceeds,
-as the step's first button does.
+The cursor is a crosshair over the photo, your clicks are red, and a right-click removes the last one. A
+double-click (or Enter) on the last point of a step proceeds, as the step's first button does.
 
 "Yes, use this strip" proceeds to the next photo. If a photo holds a second strip of the test, "Use it,
-and frame another strip in this photo" frames the next one with the same scale. A strip needs at least
+and crop another strip in this photo" crops the next one with the same scale. A strip needs at least
 10 positions. The test's thickness is the mean of every position used, all strips of all photos
-together, and is saved when the last photo is done; closing the window instead keeps the thickness
-saved before (with none saved, a box asks to type one). The positions, a summary per strip (with its
+together, and fills in the test's box in the thickness window when the last photo is done; closing the
+photo window instead leaves the box as it was. The positions, a summary per strip (with its
 frame) and a picture of each photo are saved in the test's `thickness` folder.
 
 ### Where the thickness is saved
@@ -226,12 +243,6 @@ pipeline uses:
 "thickness_mm": {"H": 1.237, "H_sd": 0.251, "source": "measured from 3 photo(s), 3 strip(s), 349 positions"}
 ```
 
-To use another thickness for one run, give it when running the test:
-
-```matlab
-runDIC('C:\Data\N1900_LFPA\test1_10142026_PLC25_40-12', 'thickness_mm', 1.25)
-```
-
 Without a thickness, the stress columns are `NaN`; everything else is written. To add or change a
 thickness later without tracking again, run only the thickness and export steps:
 
@@ -241,12 +252,17 @@ runDIC('C:\Data\N1900_LFPA', 'steps', {'thickness', 'export'})
 
 ## Running only some steps
 
-The steps are, in order: `info`, `thickness`, `sort`, `tines`, `scale`, `widths`, `branches`, `track`,
+The steps are, in order: `info`, `thickness`, `sort`, `tines`, `scale`, `widths`, `track`,
 `artifacts`, `export`, `report`. To run some of them:
 
 ```matlab
 runDIC(folder, 'steps', {'track', 'export'})
 ```
+
+Each of these questions, the thickness window at the start and the tracking window, has a **Cancel the run** button (in the
+label and notes window, **Cancel**): it stops the whole run there, including the tests not yet started in
+a sample folder. Closing one of these windows does the same. Tracking has no window; Ctrl-C in the Command Window
+stops it.
 
 Each step uses what the earlier ones wrote, so after changing something, run that step and the ones
 after it.
@@ -262,12 +278,11 @@ folder marks the steps already done; pick the others. A tracking step that was i
 `DIC_settings.m` holds the settings, each explained in the file: the steps, the thickness, the
 deformations, the DIC sizes (in mm), the limits of the tracking report and how often the tracking
 progress line is updated. The defaults suit these tests. `track_deformations` (Def01–Def19) are
-tracked; `deformations` (Def11–Def19) are analyzed: the CSVs, the loading-branch check and the
-tracking report.
+tracked; `deformations` (Def11–Def19) are analyzed: the CSVs and the tracking report.
 
-`review_sort = false`, `review_tines = false`, `review_branches = false`, `review_tracking = false` and
-`ask_thickness = false` turn off the sorting check, the tine-tip question, the loading-branch question,
-the tracking report window and the thickness window, for example when running many tests unattended;
+`review_sort = false`, `review_tines = false`, `review_tracking = false`, `ask_thickness = false`,
+`ask_tracking = false` and `ask_export = false` turn off the sorting check, the tine-tip question, the tracking report window, the thickness window, the tracking window and the export window (the
+settings `track_deformations`, `loading_only`, `export_deformations` and `export_formats` are then used), for example when running many tests unattended;
 leave `info` and `thickness` out of the steps then too.
 
 The tracking needs about 1 GB of memory.
@@ -279,7 +294,7 @@ The tracking needs about 1 GB of memory.
 | `Images\Def01_…` … `Def19_…` | the sorted images (`sort_manifest.csv`: every move; `sort_summary.csv`: the completeness of every cycle) |
 | `test_config.json` | sample label and notes, thickness, tine tips, tracking region, widths, excluded regions |
 | `scale_calibration.json` | image scale (px per mm) |
-| `loading_branches.json` | loading branches set by hand (start and end, s) |
+| `loading_branches.json` | loading branches set by hand (start and end, s), used instead of the automatic ones; only when written by hand or by the Python version |
 | `DIC_results\DefNN_….mat` | the DIC tracks (point positions in every frame) |
 | `DIC_results\*.png` | the pictures to check |
 | `DIC_results\tracking_report.csv` | tracking quality of every deformation (its verdict is also in `stress_stretch\README.txt`) |

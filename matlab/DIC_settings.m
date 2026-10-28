@@ -4,12 +4,12 @@ function s = DIC_settings()
 
 % ---- what to run
 % Steps, in order: 'info' (sample label and notes), 'thickness' (measure the thickness from the photos;
-% if the test already has one, you are asked whether to keep it), 'sort' (images into one folder per
+% typed or measured, in the thickness window), 'sort' (images into one folder per
 % cycle, with a completeness check), 'tines' (find the tine tips), 'scale' (image scale), 'widths' (tine
-% spans), 'branches' (check the loading branches), 'track' (DIC), 'artifacts' (find and exclude local
+% spans), 'track' (DIC), 'artifacts' (find and exclude local
 % tracking errors, then track again if any), 'export' (stress-stretch CSVs and the AllData file),
 % 'report' (open the tracking report; it reads the existing tracks, so it can be chosen alone).
-s.steps = {'info', 'thickness', 'sort', 'tines', 'scale', 'widths', 'branches', 'track', 'artifacts', 'export', 'report'};
+s.steps = {'info', 'thickness', 'sort', 'tines', 'scale', 'widths', 'track', 'artifacts', 'export', 'report'};
 
 % Label added to the sample name in test_config.json (for example 'healthy'); '' for none. The 'info'
 % step asks for it (and for notes) in a window instead.
@@ -19,16 +19,14 @@ s.label = '';
 s.review_sort = true;                  % the completeness of every cycle after sorting
 
 % Tine tips: 'auto' finds them in the image (if that fails for a rake, you are asked to click its tips);
-% 'click' asks you to click all 20 (5 per rake) when the automatic ones are wrong. Clicks are refined.
+% 'click' asks you to click all 20 (5 per rake) when the automatic ones are wrong. Clicks are kept as clicked.
 s.tine_tips = 'auto';
 s.review_tines = true;                 % show the tips found and ask whether they are right
 
 % ---- specimen
-% Wall thickness H (mm) for the stresses. Leave empty ([]) to use each test's own, measured from its
-% photos or typed in the thickness window and saved as thickness_mm.H in its test_config.json. A number
-% here is used for every test instead. Without a thickness the stress columns are NaN; the forces,
-% stretches and tensions are still written.
-s.thickness_mm = [];
+% Wall thickness H (mm) for the stresses: each test's own, measured from its photos or typed in the
+% thickness window and saved as thickness_mm.H in its test_config.json. Without a thickness the stress
+% columns are NaN; the forces, stretches and tensions are still written.
 s.ask_thickness = true;                % ask at the start for every test without a thickness (desktop only)
 % Thickness measured from the photos (the 'thickness' step): positions every thickness_step_mm along the
 % strip, edges searched up to thickness_search_mm either side of the centerline, thickness_trim_mm left
@@ -39,11 +37,17 @@ s.thickness_trim_mm = 0.5;
 
 % ---- deformations
 s.reference_deformation = 11;          % its first frame is the common reference of the stretches
-s.deformations = 11:19;                % analyzed: the CSVs, the loading-branch review, the tracking report
+s.deformations = 11:19;                % analyzed: the CSVs and the tracking report
 s.track_deformations = 1:19;          % tracked; Def01-Def10 (preconditioning) only for the AllData file's rows
 s.calibration_deformations = [1 19];   % used for the image scale
 s.loading_only = true;                 % track each deformation only up to the end of its loading branch
-s.review_branches = true;              % show the loading branches and ask whether they are right (desktop only)
+s.ask_tracking = true;                 % ask at the start which deformations to track, and loading only or the whole cycle (desktop only)
+% Export: the deformations and the files written by the export step. Formats: 'csv' (one CSV per
+% protocol), 'all_csv' (all_protocols.csv), 'png', 'pdf' and 'fig' (the stress-stretch plot), 'xlsx'
+% (the AllData file in CellScale's layout). README.txt is always written.
+s.export_deformations = 11:19;
+s.export_formats = {'csv', 'all_csv', 'png', 'xlsx'};
+s.ask_export = true;                   % ask at the start which deformations and files to export (desktop only)
 
 % ---- DIC (physical sizes, mm)
 s.target_px_per_mm = 50;               % images are resampled (down only) to this scale before tracking

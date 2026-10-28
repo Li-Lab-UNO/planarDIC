@@ -33,41 +33,43 @@ set(hImg, 'UserData', @addClick);
 axis(ax, 'image', 'off'); hold(ax, 'on');
 disableDefaultInteractivity(ax); ax.Toolbar.Visible = 'off';
 set(ax, 'ButtonDownFcn', @onClick);      % overlays let clicks through (PickableParts none); the axes catch the rest
-hLine = plot(ax, NaN, NaN, '-o', 'Color', [1 0.75 0.1], 'MarkerFaceColor', [1 0.75 0.1], 'LineWidth', 2, 'PickableParts', 'none');
+hLine = plot(ax, NaN, NaN, '-o', 'Color', [1 0 0], 'MarkerFaceColor', [1 0 0], 'MarkerEdgeColor', 'w', 'LineWidth', 2, 'PickableParts', 'none');   % the clicks
 hOk = plot(ax, NaN, NaN, '-', 'Color', [0.9 0.15 0.15], 'LineWidth', 0.8, 'PickableParts', 'none');
 hOut = plot(ax, NaN, NaN, '-', 'Color', [1 0.6 0], 'LineWidth', 1.2, 'PickableParts', 'none');
 hEx = plot(ax, NaN, NaN, '-', 'Color', [0.55 0.55 0.55], 'LineWidth', 0.8, 'PickableParts', 'none');
 hEdge = plot(ax, NaN, NaN, '.', 'Color', [0.9 0.15 0.15], 'MarkerSize', 6, 'PickableParts', 'none');
 hDone = plot(ax, NaN, NaN, '-', 'Color', [0.2 0.85 0.3], 'LineWidth', 0.6, 'PickableParts', 'none');
-hFrame = plot(ax, NaN, NaN, '--', 'Color', [1 0.85 0.2], 'LineWidth', 1.5, 'PickableParts', 'none');
-hPrev = plot(ax, NaN, NaN, '--', 'Color', [1 0.75 0.1], 'LineWidth', 1.5, 'PickableParts', 'none');   % follows the cursor
+hFrame = plot(ax, NaN, NaN, '--', 'Color', [1 0 0], 'LineWidth', 1.5, 'PickableParts', 'none');
+hPrev = plot(ax, NaN, NaN, '--', 'Color', [1 0 0], 'LineWidth', 1.5, 'PickableParts', 'none');   % follows the cursor
 
 x0 = 0.72; w = 0.26;
-txtTitle = uicontrol(fig, 'Style', 'text', 'Units', 'normalized', 'Position', [x0 0.92 w 0.06], 'FontSize', 13, ...
+txtTitle = uicontrol(fig, 'Style', 'text', 'Units', 'normalized', 'Position', [x0 0.92 w 0.06], 'FontSize', 11, ...
                      'FontWeight', 'bold', 'HorizontalAlignment', 'left', 'BackgroundColor', 'w');
-txtIns = uicontrol(fig, 'Style', 'text', 'Units', 'normalized', 'Position', [x0 0.66 w 0.26], 'FontSize', 12, ...
+txtIns = uicontrol(fig, 'Style', 'text', 'Units', 'normalized', 'Position', [x0 0.66 w 0.26], 'FontSize', 10, ...
                    'HorizontalAlignment', 'left', 'BackgroundColor', 'w');
-lblSize = uicontrol(fig, 'Style', 'text', 'Units', 'normalized', 'Position', [x0 0.615 0.05 0.03], 'String', 'Size', ...
-                    'FontSize', 12, 'HorizontalAlignment', 'left', 'BackgroundColor', 'w');
-edtSize = uicontrol(fig, 'Style', 'edit', 'Units', 'normalized', 'Position', [x0 + 0.05 0.615 0.08 0.035], ...
-                    'String', sq.value, 'FontSize', 12, 'Callback', @(~, ~) set(txtErr, 'String', ''));
-popUnit = uicontrol(fig, 'Style', 'popupmenu', 'Units', 'normalized', 'Position', [x0 + 0.14 0.615 0.07 0.035], ...
-                    'String', units, 'Value', max(1, find(strcmp(units, sq.unit), 1)), 'FontSize', 12);
-txtErr = uicontrol(fig, 'Style', 'text', 'Units', 'normalized', 'Position', [x0 0.575 w 0.035], 'FontSize', 11, ...
+% controls as in MATLAB's own dialogs (pixels), placed by placePanel at the window's current size
+lblSize = uicontrol(fig, 'Style', 'text', 'Position', [0 0 40 16], 'String', 'Size', ...
+                    'FontSize', 10, 'HorizontalAlignment', 'left', 'BackgroundColor', 'w');
+edtSize = uicontrol(fig, 'Style', 'edit', 'Position', [0 0 70 22], ...
+                    'String', sq.value, 'Callback', @(~, ~) set(txtErr, 'String', ''));
+popUnit = uicontrol(fig, 'Style', 'popupmenu', 'Position', [0 0 70 22], ...
+                    'String', units, 'Value', max(1, find(strcmp(units, sq.unit), 1)));
+txtErr = uicontrol(fig, 'Style', 'text', 'Units', 'normalized', 'Position', [x0 0.575 w 0.035], 'FontSize', 10, ...
                    'ForegroundColor', [0.8 0.1 0.1], 'HorizontalAlignment', 'left', 'BackgroundColor', 'w');
 btn = gobjects(6, 1);
 for kb = 1:6
-    btn(kb) = uicontrol(fig, 'Style', 'pushbutton', 'Units', 'normalized', 'Position', [x0 0.52 - (kb - 1) * 0.052 w 0.045], ...
-                       'FontSize', 12, 'Visible', 'off');
+    btn(kb) = util.button(fig, '', [0 0], [], 'Visible', 'off');   % width set to the label in render
 end
-txtStat = uicontrol(fig, 'Style', 'text', 'Units', 'normalized', 'Position', [x0 0.08 w 0.16], 'FontSize', 12, ...
+txtStat = uicontrol(fig, 'Style', 'text', 'Units', 'normalized', 'Position', [x0 0.08 w 0.16], 'FontSize', 10, ...
                     'HorizontalAlignment', 'left', 'BackgroundColor', 'w', 'FontName', 'FixedWidth');
-btnView = uicontrol(fig, 'Style', 'pushbutton', 'Units', 'normalized', 'Position', [x0 0.02 0.12 0.04], 'String', 'Whole photo', ...
-                    'FontSize', 11, 'Callback', @(~, ~) wholePhoto());
-uicontrol(fig, 'Style', 'text', 'Units', 'normalized', 'Position', [x0 + 0.13 0.015 0.13 0.045], 'FontSize', 10, ...
+btnView = util.button(fig, 'Back to the crop', [0 14], @(~, ~) wholePhoto());   % sized for its longer label
+set(btnView, 'String', 'Whole photo');
+txtZoom = uicontrol(fig, 'Style', 'text', 'Position', [0 14 260 18], ...
           'String', 'Scroll to zoom where the pointer is.', 'HorizontalAlignment', 'left', 'BackgroundColor', 'w', ...
           'ForegroundColor', [0.4 0.4 0.4]);
 
+set(fig, 'SizeChangedFcn', @(~, ~) placePanel());
+placePanel();
 nextPhoto();
 uiwait(fig);
 if cancelled || ~isvalid(fig), if isvalid(fig), delete(fig); end, return; end
@@ -91,6 +93,20 @@ res = finish();
         setState('scale1');
     end
 
+    function placePanel()
+        % The panel's pixel-sized controls at the window's current size: on opening (a maximized window
+        % gets its size only once shown) and whenever it is resized.
+        fp = getpixelposition(fig); X0 = x0 * fp(3); ySize = 0.62 * fp(4);
+        set(lblSize, 'Position', [X0 ySize 40 16]);
+        set(edtSize, 'Position', [X0 + 44 ySize - 3 70 22]);
+        set(popUnit, 'Position', [X0 + 122 ySize - 3 70 22]);
+        for kk = 1:numel(btn)
+            pb = get(btn(kk), 'Position'); set(btn(kk), 'Position', [X0, 0.565 * fp(4) - kk * 28, pb(3:4)]);
+        end
+        pv = get(btnView, 'Position'); set(btnView, 'Position', [X0 14 pv(3:4)]);
+        set(txtZoom, 'Position', [X0 + pv(3) + 12 14 260 18]);
+    end
+
     function setState(st)
         state = st; pts = zeros(0, 2);
         if any(strcmp(st, {'seed', 'edgeA'})), edgeA = zeros(0, 2); end
@@ -98,73 +114,75 @@ res = finish();
     end
 
     function render()
-        set(txtTitle, 'String', sprintf('%s (photo %d of %d), strip %d', photos{iPhoto}, iPhoto, numel(photos), stripNo));
+        set(txtTitle, 'String', sprintf('%s (photo %d of %d)', photos{iPhoto}, iPhoto, numel(photos)));
         set([lblSize edtSize popUnit], 'Visible', util.onOff(strcmp(state, 'scale1')));
         set(txtErr, 'String', ''); stat = ''; B = {};
         switch state
             case 'scale1'
-                ins = {'Scale, part 1: one square', '', ...
-                       '1. Zoom in near the strip (scroll where the pointer is).', ...
-                       '2. Click on one grid line, then on the next one, straight across one square (or one ruler tick).', ...
-                       '3. Type the size of that square or tick and choose its unit, then press Next (or double-click the second point).', '', ...
-                       'Right-click (or Backspace) removes the last click.'};
-                if size(pts, 1) == 2, stat = sprintf('one square: %.1f px', L1); end
+                ins = {'Step 1 of 5: Scale, 1 grid spacing', '', ...
+                       '1. Click on a grid line, then on the next one, straight across one grid spacing (or one ruler tick).', ...
+                       '2. Type the size of that spacing and choose its unit, then press Next.', '', ...
+                       'Right-click to remove a marker.'};
+                if size(pts, 1) == 2, stat = sprintf('one grid spacing: %.1f px', L1); end
                 B = {'Next', @scaleNext; 'Skip this photo', @() nextPhoto()};
             case 'scale2'
-                ins = {'Scale, part 2: a long line', '', ...
-                       '1. Click on a grid line (or tick), then on another one as far away as the photo allows, close to the strip.', ...
-                       '2. The squares in between are counted for you. Confirm the count (or double-click the second point).', '', ...
-                       'Zoom in for each click, and out (or "Whole photo") in between.'};
+                ins = {'Step 2 of 5: Scale check', '', ...
+                       '1. Click on a grid line near the strip, then on another grid line as far away as the photo allows.', ...
+                       '2. Check the count of grid spacings between your clicks (below) and press Confirm.', '', ...
+                       'Right-click to remove a marker.'};
                 B = {'Back', @() setState('scale1')}; scaleOk = false;
                 if size(pts, 1) == 2
                     L2 = norm(diff(pts));
                     [p, n, ratio] = thicknessCore.scaleFromLines(L1, L2, sizeMm);
                     if abs(ratio - n) > 0.25
-                        stat = sprintf('%.2f squares: the ends are not on grid lines. Draw it again.', ratio);
+                        ins = [ins, {'', sprintf(['%.2f grid spacings between your clicks: not a whole number, so a click is ' ...
+                                                  'off a grid line (here or in step 1). Draw again.'], ratio)}];
                         B = [{'Draw again', @() setState('scale2')}; B];
                     else
                         nSq = n; pxmm = p; u = get(popUnit, 'Value'); scaleOk = true;
-                        stat = sprintf('%d squares = %g %s (%.2f mm)\nscale %.2f px/mm', n, ...
-                                       round(n * sizeMm / unitMm(u), 4), units{u}, n * sizeMm, pxmm);
-                        B = [{sprintf('Yes, %d squares', n), @() setState('frame'); 'Draw again', @() setState('scale2')}; B];
+                        ins = [ins, {'', sprintf('%d grid spacings between your clicks = %g %s (%.2f mm): scale %.2f px/mm.', n, ...
+                                                 round(n * sizeMm / unitMm(u), 4), units{u}, n * sizeMm, pxmm)}];
+                        B = [{'Confirm', @() setState('frame'); 'Draw again', @() setState('scale2')}; B];
                     end
                 end
             case 'frame'
-                ins = {'Frame the strip', '', ...
-                       'Click two opposite corners of a box around the strip to measure (double-click the second corner to proceed). The view then stays on it.', '', ...
-                       'Measure complete strips only; leave out pieces cut off by the edge of the photo. If the photo holds a second strip of this test, you can frame it after the first.'};
-                B = {'No frame (whole photo)', @() useFrame([])};
+                ins = {'Step 3 of 5: Crop', '', ...
+                       '1. Click two opposite corners of an ROI around the strip.', ...
+                       '2. Press Use this crop. The view then stays on it.', '', ...
+                       'Crop whole strips only; leave out pieces cut off at the edge of the photo. If this photo has a second strip of this test, you can crop it after this one.'};
+                B = {'No crop (whole photo)', @() useFrame([])};
                 if size(pts, 1) == 2
-                    B = [{'Use this frame', @() useFrame(pts); 'Draw again', @() setState('frame')}; B];
+                    B = [{'Use this crop', @() useFrame(pts); 'Draw again', @() setState('frame')}; B];
                 end
             case 'seed'
-                ins = {sprintf('Centerline of strip %d', stripNo), '', ...
-                       '1. Click along the middle of the strip, from one end to the other. Two clicks for a straight strip, more where it bends.', ...
-                       '2. Right-click (or Backspace) removes the last click. Double-click the last point (or press Done or Enter) to finish.', '', ...
-                       'Leave out pieces cut off by the edge of the photo.'};
+                ins = {'Step 4 of 5: Trace the centerline', '', ...
+                       '1. Click along the middle of the strip, from one end to the other.', ...
+                       '2. Press Done (or Enter, or double-click the last point). The edges are then found for you.', '', ...
+                       'Right-click to remove a marker.'};
                 stat = sprintf('%d click(s)', size(pts, 1));
                 B = {'Done', @seedDone; 'Skip this photo', @() nextPhoto()};
             case 'check'
-                ins = {'Do the red marks sit on both edges of the strip?', '', ...
-                       'Orange: far from the rest of the strip (a loose fiber, a cut end), left out automatically.', ...
-                       'Gray: removed by you.'};
+                ins = {'Step 5 of 5: Check the thickness measurements', '', ...
+                       'Each red line should cross the strip and end on both of its edges.', '', ...
+                       'Orange lines were left out automatically (a loose fiber or a cut end). Gray lines are ones you removed.'};
                 stat = stripStats();
-                B = {'Yes, use this strip', @() useStrip(false); 'Use it, and frame another strip in this photo', @() useStrip(true); ...
+                B = {'Yes, use this strip', @() useStrip(false); 'Use it, and crop another strip in this photo', @() useStrip(true); ...
                      'Remove a section', @() setState('cut'); ...
                      'Redraw the centerline', @() setState('seed'); 'Click the edges myself', @() setState('edgeA'); ...
                      'Skip this strip', @skipStrip};
             case 'cut'
-                ins = {'Remove a section', '', 'Click the two ends of the section to leave out (along the strip).'};
+                ins = {'Remove a section', '', 'Click the two ends of the stretch to leave out, along the strip. Its lines turn gray.'};
                 stat = stripStats();
                 B = {'Cancel', @() setState('check')};
             case 'edgeA'
-                ins = {'Click the edges yourself: first edge', '', ...
-                       'Click along one edge of the strip, end to end; double-click the last point (or press Done or Enter).', ...
-                       'Right-click (or Backspace) removes the last click.'};
+                ins = {'Click the edges yourself, 1 of 2', '', ...
+                       'Click along one edge of the strip from end to end, then press Done.', '', ...
+                       'Right-click to remove a marker.'};
                 B = {'Done', @edgeADone; 'Cancel', @() setState('seed')};
             case 'edgeB'
-                ins = {'Click the edges yourself: second edge', '', ...
-                       'Now click along the other edge, end to end; double-click the last point (or press Done or Enter).'};
+                ins = {'Click the edges yourself, 2 of 2', '', ...
+                       'Now click along the other edge from end to end, then press Done.', '', ...
+                       'Right-click to remove a marker.'};
                 B = {'Done', @edgeBDone; 'Cancel', @() setState('seed')};
         end
         if ~isempty(msg), stat = sprintf('%s\n\n%s', stat, msg); end
@@ -172,6 +190,7 @@ res = finish();
         for k = 1:6
             if k <= size(B, 1)
                 set(btn(k), 'String', B{k, 1}, 'Callback', @(~, ~) B{k, 2}(), 'Visible', 'on');
+                util.fitButton(btn(k));
             else
                 set(btn(k), 'Visible', 'off');
             end
@@ -182,8 +201,8 @@ res = finish();
     % ================================================================== actions
     function scaleNext()
         v = str2double(strrep(strtrim(get(edtSize, 'String')), ',', '.'));
-        if size(pts, 1) < 2, set(txtErr, 'String', 'Click across one square first.'); return; end
-        if ~(isfinite(v) && v > 0), set(txtErr, 'String', 'Enter the size of the square, for example 0.5.'); return; end
+        if size(pts, 1) < 2, set(txtErr, 'String', 'Click across one grid spacing first.'); return; end
+        if ~(isfinite(v) && v > 0), set(txtErr, 'String', 'Enter the size of the grid spacing, for example 0.5.'); return; end
         u = get(popUnit, 'Value');
         sizeMm = v * unitMm(u); L1 = norm(diff(pts));
         setpref('runDIC', 'thickness_square', struct('value', get(edtSize, 'String'), 'unit', units{u}));
@@ -242,7 +261,7 @@ res = finish();
         strips{end + 1} = struct('photo', photos{iPhoto}, 'strip', stripNo, 'S', S, 'pxmm', pxmm, ...
                                  'scale', sprintf('%d squares of %.4g mm', nSq, sizeMm), 'frame', frame);
         if ~another, nextPhoto(); return; end
-        msg = sprintf('Strip %d saved (%.3f mm). Frame the next strip.', stripNo, mean(S.thickness_mm(used())));
+        msg = sprintf('Strip saved (%.3f mm). Crop the next strip.', mean(S.thickness_mm(used())));
         stripNo = stripNo + 1; S = []; frame = []; wholePhoto(); setState('frame');
     end
 
@@ -338,7 +357,7 @@ res = finish();
                 if size(pts, 1) ~= 1, return; end
                 set(hPrev, 'XData', [q(1) p(1)], 'YData', [q(2) p(2)]);
                 if strcmp(state, 'scale2')
-                    set(txtStat, 'String', sprintf('%.2f squares', norm(p - q) / L1));
+                    set(txtStat, 'String', sprintf('%.2f grid spacings', norm(p - q) / L1));
                 else
                     set(txtStat, 'String', sprintf('%.1f px', norm(p - q)));
                 end
@@ -377,7 +396,7 @@ res = finish();
             xs = c(1) + [-0.5 0.5] * side; ys = c(2) + [-0.5 0.5] * side * H / W;
             set(ax, 'XLim', min(max(xs, 0.5), W + 0.5), 'YLim', min(max(ys, 0.5), H + 0.5));
         end
-        set(btnView, 'String', util.ternary(isempty(frame), 'Whole photo', 'Back to the frame'));
+        set(btnView, 'String', util.ternary(isempty(frame), 'Whole photo', 'Back to the crop'));
         refreshImage();
     end
 

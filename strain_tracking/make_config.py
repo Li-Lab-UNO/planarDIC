@@ -23,20 +23,21 @@ can pass, so check the overlay.
 
 Written: sample, roi_px, tine_tips_px (median tip per rake), calibration_tines_px, reference_deformation;
 dic.mask_saturated (on when the tissue in the rest frame has saturated glints, off when it has none or is
-overexposed, >= 10% saturated) unless the config sets it; thickness_mm from the sample's thickness
-workbook (Thickness, <ID>/*.xlsx), if there is one and the config doesn't set it (the pipeline's thickness
-step then replaces it with the photo measurement, unless thickness = workbook). widths_mm is left to
-measure_tines.py --write; when a config exists, --update
+overexposed, >= 10% saturated) unless the config sets it. widths_mm is left to measure_tines.py --write
+and thickness_mm to the thickness step (thickness/measure_interactive.py); when a config exists, --update
 replaces only the keys written here and keeps the rest, and a rake that fails the self-check starts from
 its existing tines. Finally every tip is refined with calibrate_scale.find_tip (the tip finder the scale
 calibration applies frame by frame) and tine_tips_px is the median of the refined tips per rake.
+
+With --review (runDIC.sh: review = yes), the tips are shown and the question is whether every red circle
+is on the tip of a tine; the rakes answered wrong are clicked (5 tips each) and refined the same way. A
+rake that fails the self-check, with no tines in the config to start from, is clicked too.
 
     .venv/bin/python strain_tracking/make_config.py --test N1757/test1 --label "labeled healthy"
     .venv/bin/python strain_tracking/make_config.py --test N1739/test1 --out /tmp/check.json       (compare, no overwrite)
 Output: <test>/test_config.json (or --out) and <test>/DIC_results/config_tine_tips.png
 """
 import argparse
-import glob
 import os
 import re
 import sys
@@ -48,6 +49,7 @@ from scipy.signal import find_peaks
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import dic2d as D  # noqa: E402
+import review  # noqa: E402
 import testcfg  # noqa: E402
 
 N_RODS = 5
@@ -255,23 +257,58 @@ def overlay(rgb, rakes, tips_px, path):
     cv2.imwrite(path, rgb[max(0, y0 - pad):y1 + pad, max(0, x0 - pad):x1 + pad])
 
 
-def thickness_from_workbook(T):
-    """thickness_mm from the sample's manual readings (Thickness, <ID>/*.xlsx, read by
-    thickness/compare_manual.py): mean and sample SD of this test's readings. None if there is no workbook
-    or it has no block for this test."""
-    m = re.match(r"test(\d+)", T.name)
-    books = glob.glob(os.path.join(os.path.dirname(T.root), "Thickness*", "*.xlsx"))
-    if not m or not books:
+def show_tips(gray8, rakes, tips_px):
+    """The tips over the rest frame, with the question and its answers in the same window: "Yes, continue" or
+    "Click <RAKE> again" (closing the window answers "Yes, continue")."""
+    fig = review.figure("runDIC: tine tips")
+    ax = fig.add_axes([0.02, 0.15, 0.96, 0.78])
+    ax.imshow(gray8, cmap="gray", vmin=0, vmax=255)
+    for r in rakes.values():
+        xy = np.array([(t, c) if r["horizontal"] else (c, t) for c, t in r["tips"]], float)
+        ax.plot(xy[:, 0], xy[:, 1], "o", ms=10, mfc="none", mec="r", mew=1.5)
+    (x0, x1), (y0, y1) = tips_px["z"], tips_px["theta"]
+    ax.plot([x0, x1, x1, x0, x0], [y0, y0, y1, y1, y0], "y-", lw=1.5)
+    pad = 150
+    ax.set_xlim(x0 - pad, x1 + pad)
+    ax.set_ylim(y1 + pad, y0 - pad)
+    ax.axis("off")
+    ax.set_title("Tine tips (red circles) and tine-tip lines (yellow): every circle should sit on a tine tip",
+                 fontsize=11)
+    fig.canvas.mpl_connect("scroll_event", lambda e: review.zoom(ax, e))
+    return review.ask(fig, "Is every red circle on the tip of a tine? (The yellow rectangle joins the tips of "
+                      "each rake.) If a rake's circles are off, click that rake again.",
+                      ["Yes, continue"] + [f"Click {s.upper()} again" for s in RAKES])
+
+
+def click_rake(gray8, side, near=None):
+    """The 5 tips of one rake, clicked on the rest frame (None if the window is closed). The view starts on
+    the rake: around its tips `near` ([centerline, tip] pairs) when given, else the half of the frame it
+    comes from; the scroll wheel zooms."""
+    hor, out = RAKES[side]
+    fig = review.figure(f"Click the 5 tine tips of the {side.upper()} rake")
+    ax = fig.add_axes([0.02, 0.02, 0.96, 0.9])
+    ax.imshow(gray8, cmap="gray", vmin=0, vmax=255)
+    ax.axis("off")
+    H, W = gray8.shape
+    if near:
+        xy = np.array([(t, c) if hor else (c, t) for c, t in near], float)
+        (x0, y0), (x1, y1) = xy.min(0), xy.max(0)
+        pad = max(60.0, 0.5 * max(x1 - x0, y1 - y0))
+        x0, x1, y0, y1 = x0 - pad, x1 + pad, y0 - pad, y1 + pad
+    else:                                                  # the half of the frame the rake comes from
+        x0, x1, y0, y1 = 0, W, 0, H
+        if hor:
+            x0, x1 = (0, W / 2) if out < 0 else (W / 2, W)
+        else:
+            y0, y1 = (0, H / 2) if out < 0 else (H / 2, H)
+    ax.set_xlim(max(x0, -0.5), min(x1, W - 0.5))
+    ax.set_ylim(min(y1, H - 0.5), max(y0, -0.5))
+    pts = review.click_points(fig, ax, N_RODS, f"Click the tip of each of the 5 tines of the {side.upper()} rake "
+                              "(the end of the rod, where it meets the tissue)")
+    if pts is None:
         return None
-    sys.path.insert(0, os.path.join(testcfg.ROOT, "thickness"))
-    from compare_manual import manual_readings
-    readings, _ = manual_readings(books[0])
-    v = [x for _, vals in readings.get(int(m[1]), []) for x in vals]
-    if len(v) < 2:
-        return None
-    src = os.path.relpath(books[0], os.path.dirname(os.path.dirname(T.root)))
-    return {"H": round(float(np.mean(v)), 5), "H_sd": round(float(np.std(v, ddof=1)), 4),
-            "source": f"{src}: mean and sample SD of {len(v)} readings"}
+    ct = sorted((y, x) if hor else (x, y) for x, y in pts)       # (centerline, tip), image px
+    return dict(horizontal=hor, out=out, tips=[[round(c), round(t)] for c, t in ct])
 
 
 def refine(g, rakes):
@@ -281,7 +318,8 @@ def refine(g, rakes):
     measure_tines.py). A refinement is kept when its last two passes agree within SETTLE_PX (on some rods
     find_tip alternates between the two edges, and the tip with them), its rod-to-tissue contrast exceeds 30
     gray levels and it moves the tip by at most 25 px (centerline at most 10 px); otherwise the detected tip
-    is kept. Returns the refined rakes and the number of tips kept unrefined."""
+    is kept. Clicked tips are not refined (they stay where they were clicked). Returns the refined rakes and
+    the number of tips kept unrefined."""
     from calibrate_scale import find_tip as cal_find_tip
     out, kept = {}, 0
     for side, r in rakes.items():
@@ -311,7 +349,10 @@ def main():
     ap.add_argument("--update", action="store_true",
                     help="update an existing test_config.json: replace the keys written here, keep the rest; a rake "
                          "that fails the self-check starts from its existing tines instead")
+    ap.add_argument("--review", action="store_true", help="show the tips and ask whether they are right")
     a = ap.parse_args()
+    if a.review:
+        review.enable()
     T = testcfg.get()
     out_path = a.out or T.config_file
     if a.out is None and os.path.exists(T.config_file) and not a.update:
@@ -324,22 +365,41 @@ def main():
     g = cv2.GaussianBlur(gray8.astype(np.float32), (0, 0), 1.0)
     rakes, problems = detect(g)
     failed = sorted({p.split()[0] for p in problems})
+    clicked = []                                        # rakes whose tips were clicked: kept as clicked
     if problems:
         print("SELF-CHECK FAILED:\n  " + "\n  ".join(problems))
-        existing = T.config.get("calibration_tines_px", {})
-        if a.update and all(sd in existing for sd in failed):
-            for sd in failed:                           # start those rakes from the existing tines
+        existing = T.config.get("calibration_tines_px", {}) if a.update else {}
+        unresolved = []
+        for sd in failed:
+            if sd in existing:                          # start the rake from its existing tines
                 rakes[sd] = {k: existing[sd][k] for k in ("horizontal", "out", "tips")}
-            print(f"  using the existing tines of the {', '.join(failed)} rake(s) as starting points")
-        elif len(rakes) < len(RAKES) or not a.allow_warnings:
-            sys.exit("nothing written; check the rest frame, or pass --allow-warnings to write anyway")
+                print(f"  {sd} rake: using its existing tines as starting points")
+            elif review.enabled() and (r := click_rake(gray8, sd, rakes.get(sd, {}).get("tips"))):
+                rakes[sd] = r
+                clicked.append(sd)
+                print(f"  {sd} rake: using the tips clicked")
+            else:
+                unresolved.append(sd)
+        if any(sd not in rakes for sd in unresolved) or (unresolved and not a.allow_warnings):
+            sys.exit("nothing written; check the rest frame, run with --review to click the tips, or pass "
+                     "--allow-warnings to write anyway")
+    g08 = cv2.GaussianBlur(gray8.astype(np.float32), (0, 0), 0.8)
     detected = {sd: [list(t) for t in r["tips"]] for sd, r in rakes.items()}
-    rakes, kept = refine(cv2.GaussianBlur(gray8.astype(np.float32), (0, 0), 0.8), rakes)
+    refined, kept = refine(g08, {sd: r for sd, r in rakes.items() if sd not in clicked})
+    rakes = {sd: refined.get(sd, rakes[sd]) for sd in rakes}
+    kept += N_RODS * len(clicked)
     moved = [abs(t - d[1]) for sd in rakes for (c, t), d in zip(rakes[sd]["tips"], detected[sd])]
     print(f"refined with calibrate_scale.find_tip: {20 - kept} of 20 tips (median move {np.median(moved):.0f} px, "
-          f"max {max(moved):.0f} px); {kept} kept as detected")
+          f"max {max(moved):.0f} px); {kept} kept as detected or clicked")
     med = lambda side: int(round(float(np.median([t for _, t in rakes[side]["tips"]]))))  # noqa: E731
     tips_px = {"z": [med("left"), med("right")], "theta": [med("top"), med("bottom")]}
+    while review.enabled() and (answer := show_tips(gray8, rakes, tips_px)) != "Yes, continue":
+        sd = answer.split()[1].lower()                     # "Click LEFT again"
+        r = click_rake(gray8, sd, rakes[sd]["tips"])
+        if r:
+            rakes[sd] = r
+            print(f"  {sd} rake: tips clicked (kept as clicked)")
+        tips_px = {"z": [med("left"), med("right")], "theta": [med("top"), med("bottom")]}
     (z0, z1), (t0, t1) = tips_px["z"], tips_px["theta"]
     sat = 100 * float(np.mean(gray8[t0:t1, z0:z1] >= SAT_LEVEL))
 
@@ -358,18 +418,6 @@ def main():
                else "overexposed: masking would remove too much of the speckle")
         dic.setdefault("note", f"rest frame: {sat:.3f}% of the tine region at gray >= {SAT_LEVEL} ({why})")
     cfg["dic"] = dic
-    if "thickness_mm" not in cfg:
-        th = thickness_from_workbook(T)
-        if th:
-            cfg["thickness_mm"] = th
-            print(f"thickness: H = {th['H']} mm, SD {th['H_sd']} mm ({th['source']}); "
-                  "the thickness step replaces it with the photo measurement unless thickness = workbook")
-        else:
-            print(f"thickness: not set (no readings for {T.name.split('_')[0]} in "
-                  f"{os.path.join(os.path.basename(os.path.dirname(T.root)), 'Thickness*', '*.xlsx')}); "
-                  "the thickness step measures it from the photos")
-    else:
-        print(f"thickness: kept from the config (H = {cfg['thickness_mm'].get('H')} mm)")
     Tw = testcfg.Test(T.root)
     Tw.config_file = out_path
     Tw.write_config(cfg)

@@ -339,13 +339,28 @@ def rake_peak(Dd, t0, t_recover, slack=LOADING_SLACK_S):
     return round(float(rake.idxmax()), 1)
 
 
+def branch_by_hand(test_root, folder):
+    """Loading branch (start, end) in s of deformation `folder` (DefNN_... or DefNN) when it was set by hand in
+    the test's loading_branches.json (review_branches.py, or reviewBranches in the MATLAB version), else None."""
+    import json
+    m = re.match(r"(?i)def(\d+)", os.path.basename(str(folder)))
+    f = os.path.join(test_root, "loading_branches.json")
+    if not m or not os.path.exists(f):
+        return None
+    v = (json.load(open(f)).get("by_hand") or {}).get(f"Def{int(m.group(1)):02d}")
+    return (float(v[0]), float(v[1])) if v else None
+
+
 def loading_end_time(test_root, folder, slack=LOADING_SLACK_S):
     """Time (s) the loading branch of deformation `folder` (DefNN_...) ends: its rake peak (rake_peak), the same
-    frame the fits end the loading branch at. DefNN is the NN-th Stretch phase of Logs/*_PhaseTiming.csv
-    (sort_images.py)."""
+    frame the fits end the loading branch at, or the end set by hand (branch_by_hand). DefNN is the NN-th
+    Stretch phase of Logs/*_PhaseTiming.csv (sort_images.py)."""
     import csv
     import glob
     import pandas as pd
+    hand = branch_by_hand(test_root, folder)
+    if hand:
+        return hand[1]
     m = re.match(r"(?i)def(\d+)", os.path.basename(str(folder)))
     logs = sorted(glob.glob(os.path.join(test_root, "Logs", "*PhaseTiming.csv")))
     if not m or not logs:

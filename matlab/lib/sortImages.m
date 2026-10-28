@@ -44,7 +44,14 @@ end
 util.log('Sorting %d images into %d deformation folders (%d to move, %d outside every cycle)', ...
          numel(files), numel(names), size(moves, 1), nUnassigned);
 if ~isempty(moves), moveImages(moves, testRoot, imgDir); end
-checkSort(testRoot, imgDir, names, t0, t1, nUnassigned, settings);
+tRec = arrayfun(@(i) recoverStart(P, i), 1:numel(names));
+checkSort(testRoot, imgDir, names, t0, t1, tRec, nUnassigned, settings);
+end
+
+
+function t = recoverStart(P, n)
+% Where the n-th cycle's loading ends and unloading (its Recover phase) starts (s).
+[~, t] = util.stretchPhase(P, n);
 end
 
 
@@ -74,10 +81,11 @@ end
 end
 
 
-function checkSort(testRoot, imgDir, names, t0, t1, nUnassigned, settings)
+function checkSort(testRoot, imgDir, names, t0, t1, tRec, nUnassigned, settings)
 % Completeness of every cycle, from the tester's own files: images, Data.csv rows and Coords1.csv rows
 % missing (gaps in their times), and images without a Data.csv or Coords1.csv row at their time (a frame
-% needs all three). Asks whether to proceed (desktop only).
+% needs all three). The note says where the missing frames are and whether they fall in loading or
+% unloading (from tRec, the Recover start). Asks whether to proceed (desktop only).
 n = numel(names);
 times = cell(n, 1);
 for i = 1:n, times{i} = util.findFrames(fullfile(imgDir, names{i})); end
@@ -98,15 +106,26 @@ for i = 1:n
     if isempty(t), note{i} = 'NO IMAGES'; continue; end
     first(i) = t(1); last(i) = t(end);
     tEnd = min(t1(i), t(end) + dt);
-    [missing(i), gap] = gaps(t, t0(i), tEnd, dt);
-    dataMissing(i) = gaps(tD(tD >= t0(i) - 1e-6 & tD < tEnd - 1e-6), t0(i), tEnd, dtD);
-    if ~isempty(tC), coordsMissing(i) = gaps(tC(tC >= t0(i) - 1e-6 & tC < tEnd - 1e-6), t0(i), tEnd, dtC); end
+    miss = gaps(t, t0(i), tEnd, dt);
+    missD = gaps(tD(tD >= t0(i) - 1e-6 & tD < tEnd - 1e-6), t0(i), tEnd, dtD);
+    missing(i) = numel(miss); dataMissing(i) = numel(missD);
+    missC = [];
+    if ~isempty(tC)
+        missC = gaps(tC(tC >= t0(i) - 1e-6 & tC < tEnd - 1e-6), t0(i), tEnd, dtC);
+        coordsMissing(i) = numel(missC);
+    end
     tr = round(t * 10) / 10;
     unmatched(i) = sum(~ismember(tr, tD) | (~isempty(tC) & ~ismember(tr, tC)));
+    same = @(m) numel(m) == numel(miss) && all(abs(m - miss) < 0.05);
     p = {};
-    if missing(i) > 0, p{end + 1} = sprintf('%d image(s) missing (longest gap %.1f s)', missing(i), gap); end %#ok<AGROW>
-    if dataMissing(i) > 0, p{end + 1} = sprintf('%d Data.csv row(s) missing', dataMissing(i)); end %#ok<AGROW>
-    if coordsMissing(i) > 0, p{end + 1} = sprintf('%d Coords1.csv row(s) missing', coordsMissing(i)); end %#ok<AGROW>
+    if missing(i) > 0, p{end + 1} = sprintf('%d image(s) missing%s', missing(i), where(miss, dt, tRec(i))); end %#ok<AGROW>
+    rows = {missD, 'Data.csv', dtD; missC, 'Coords1.csv', dtC};
+    for k = 1:2
+        m = rows{k, 1};
+        if isempty(m), continue; end
+        if missing(i) > 0 && same(m), at = ' (the same frames)'; else, at = where(m, rows{k, 3}, tRec(i)); end
+        p{end + 1} = sprintf('%d %s row(s) missing%s', numel(m), rows{k, 2}, at); %#ok<AGROW>
+    end
     if unmatched(i) > 0, p{end + 1} = sprintf('%d image(s) without a Data/Coords row', unmatched(i)); end %#ok<AGROW>
     note{i} = strjoin(p, '; ');
 end
@@ -122,29 +141,57 @@ for i = find(flag)', util.log('  %s: %s', names{i}, note{i}); end
 if ~(settings.review_sort && usejava('desktop')), return; end
 
 fig = figure('Name', 'runDIC: sorted images', 'NumberTitle', 'off', 'Color', 'w', 'MenuBar', 'none', ...
-             'ToolBar', 'none', 'Position', [100 100 1040 620]);
-movegui(fig, 'center');
+             'ToolBar', 'none', 'Visible', 'off', 'Resize', 'off', ...
+             'CloseRequestFcn', @(f, ~) util.answer(f, 'Cancel the run'));
 rows = [T.folder, num2cell(T.images), compose('%.1f', T.first_image_s), compose('%.1f', T.last_image_s), ...
         num2cell([T.images_missing, T.data_rows_missing, T.coords_rows_missing]), T.note];
 rows(flag, end) = strcat('<html><b><font color="red">', rows(flag, end), '</font></b></html>');
-uitable(fig, 'Data', rows, 'ColumnName', {'Folder', 'Images', 'First|image (s)', 'Last|image (s)', 'Images|missing', ...
-        'Data.csv rows|missing', 'Coords1.csv|rows missing', 'Note'}, 'ColumnWidth', {190, 60, 75, 75, 70, 100, 100, 280}, ...
-        'RowName', [], 'Units', 'normalized', 'Position', [0.02 0.12 0.96 0.86]);
+cw = {190, 60, 75, 75, 70, 100, 100, 340};
+tbl = uitable(fig, 'Data', rows, 'ColumnName', {'Folder', 'Images', 'First|image (s)', 'Last|image (s)', 'Images|missing', ...
+        'Data.csv rows|missing', 'Coords1.csv|rows missing', 'Note'}, 'ColumnWidth', cw, 'RowName', []);
+tw = sum([cw{:}]) + 3; th = 44 + 23 * n;             % the table's own size (two-line header, rows): no empty space around it
+W = tw + 40;
 [~, tn] = fileparts(testRoot);
-uicontrol(fig, 'Style', 'text', 'Units', 'normalized', 'Position', [0.02 0.02 0.96 0.07], 'BackgroundColor', 'w', ...
-          'HorizontalAlignment', 'left', 'FontSize', 11, 'String', sprintf(['%s: %d images, one every %.2f s; %d images ' ...
-          'outside every cycle (before the first or after the last).'], strrep(tn, '_', ' '), sum(count), dt, nUnassigned));
+info = [{sprintf(['%s: %d images, one every %.2f s; %d images outside every cycle (before the first or after ' ...
+        'the last).'], strrep(tn, '_', ' '), sum(count), dt, nUnassigned)}; strcat(names(flag)', {': '}, note(flag))];
 if any(flag)
-    q = {'Some folders are missing frames (red).', 'A few missing frames are fine (the camera drops frames now and then);', ...
-         'a folder with no images or many missing means the test or the folders need a look.', '', 'Proceed with this test?'};
+    q = ['Some folders are missing frames (red). A few missing frames are fine (the camera drops frames now and then), ' ...
+         'and frames missing during unloading don''t affect the loading curves; a folder with no images or many missing ' ...
+         'means the test or the folders need a look. Proceed with this test?'];
 else
-    q = {'Every folder has all its images, Data.csv rows and Coords1.csv rows.', '', 'Proceed with this test?'};
+    q = 'Every folder has all its images, Data.csv rows and Coords1.csv rows. Proceed with this test?';
 end
-answer = questdlg(q, 'runDIC: sorted images', 'Yes, proceed', 'No, stop this test', 'Yes, proceed');
-if isvalid(fig), close(fig); end
-if strcmp(answer, 'No, stop this test')
+hInfo = uicontrol(fig, 'Style', 'text', 'Position', [20 0 W - 40 20], 'BackgroundColor', 'w', ...
+                  'HorizontalAlignment', 'left', 'FontSize', 10);   % the notes in full, under the table
+hQ = uicontrol(fig, 'Style', 'text', 'Position', [20 0 W - 40 20], 'BackgroundColor', 'w', 'HorizontalAlignment', 'left', ...
+               'FontSize', 10, 'FontWeight', 'bold');
+hi = fitText(hInfo, info); hq = fitText(hQ, {q});
+yq = 14 + 22 + 12; yi = yq + hq + 10; yt = yi + hi + 12; H = yt + th + 16;   % from the bottom: buttons, question, notes, table
+set(hQ, 'Position', [20 yq W - 40 hq]); set(hInfo, 'Position', [20 yi W - 40 hi]);
+set(tbl, 'Position', [20 yt tw th]);
+set(fig, 'Position', [100 100 W H]); movegui(fig, 'center');
+answers = {'Yes, proceed', 'Cancel the run'};
+if isfield(settings, 'n_tests') && settings.n_tests > 1       % other tests in the run: stopping this one is a choice
+    answers = {'Yes, proceed', 'No, skip to the next test', 'Cancel the run'};
+end
+util.buttonRow(fig, answers, cellfun(@(a) @(~, ~) util.answer(fig, a), answers, 'UniformOutput', false), W - 20, 14);
+set(fig, 'Visible', 'on');
+uiwait(fig);
+answer = 'Cancel the run';
+if isvalid(fig), answer = get(fig, 'UserData'); delete(fig); end
+if strcmp(answer, 'Cancel the run'), util.cancel('the sorting check'); end
+if strcmp(answer, 'No, skip to the next test')
     error('runDIC:stopped', 'Stopped after sorting (see Images/sort_summary.csv)');
 end
+end
+
+
+
+function h = fitText(hText, lines)
+% Wrap `lines` to the width of the text control and return the height (pixels) they take.
+w = textwrap(hText, lines);
+set(hText, 'String', w);
+e = get(hText, 'Extent'); h = ceil(e(4)) + 2;
 end
 
 
@@ -156,8 +203,31 @@ n = regexprep(n, '^_+|_+$', '');
 end
 
 
-function [m, longest] = gaps(t, tStart, tEnd, dt)
-% Frames missing from times t (s) between tStart and tEnd at one every dt, and the longest gap.
-d = diff([tStart; t(:); tEnd]);
-m = sum(max(0, round(d / dt) - 1)); longest = max(d);
+function miss = gaps(t, tStart, tEnd, dt)
+% Times (s) of the frames missing from times t between tStart and tEnd, at one every dt.
+u = [tStart - dt; t(:); tEnd];
+k = max(0, round(diff(u) / dt) - 1);
+miss = zeros(0, 1);
+for i = find(k)'
+    miss = [miss; u(i) + dt * (1:k(i))']; %#ok<AGROW>
+end
+end
+
+
+function s = where(miss, dt, tRec)
+% Where the missing frames are: their times, as runs, and whether they fall in loading or unloading.
+runs = {}; first = 1;
+for i = 2:numel(miss) + 1
+    if i > numel(miss) || miss(i) - miss(i - 1) > 1.5 * dt
+        if i - 1 == first, runs{end + 1} = sprintf('%.1f s', miss(first)); %#ok<AGROW>
+        else, runs{end + 1} = sprintf('%.1f-%.1f s', miss(first), miss(i - 1)); end %#ok<AGROW>
+        first = i;
+    end
+end
+if numel(runs) > 3, runs = [runs(1:3), {'...'}]; end
+n = sum(miss < tRec - 1e-6);
+if n == numel(miss), phase = 'all loading';
+elseif n == 0, phase = 'all unloading';
+else, phase = sprintf('%d loading, %d unloading', n, numel(miss) - n); end
+s = sprintf(': %s (%s)', strjoin(runs, ', '), phase);
 end

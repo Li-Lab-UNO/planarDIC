@@ -15,15 +15,16 @@ set -uo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$HERE"
 
-ALL_STEPS="sort config scale widths thickness track artifacts jfig exports edge compare fit"
+ALL_STEPS="info sort config branches thickness scale widths track artifacts report jfig exports edge compare fit"
 STEPS="$ALL_STEPS"
 DEFS="Def11 Def12 Def13 Def14 Def15 Def16 Def17 Def18 Def19"
 EXPORT_DEFS="Def11"
 PY="$HERE/.venv/bin/python"
 LABEL=""
-THICKNESS=auto
 DRY=0
 YES=0
+REVIEW=1
+LIVE=0                                   # in a terminal (set below): live status redrawn in place
 SETUP=0
 if command -v nproc >/dev/null 2>&1; then NCPU=$(nproc); else NCPU=$(sysctl -n hw.ncpu 2>/dev/null || echo 4); fi
 JOBS=$(( NCPU > 1 ? NCPU - 1 : 1 ))
@@ -42,20 +43,29 @@ TEST is SAMPLE/testN (e.g. N1739/test1) or a whole sample (e.g. N1739 = all its 
 any unique prefix of the folder name, as for --test in the scripts.
 
 Steps (in this order; --steps picks a subset, comma separated):
-  sort     sort_images.py       sort the images into Def01-Def19 folders (safe to re-run)
+  info     sample_info.py       the label and notes of each test, in a window (review = yes) ->
+                                test_config.json (sample, notes)
+  sort     sort_images.py       sort the images into Def01-Def19 folders (safe to re-run) and check
+                                every folder for missing images, Data.csv rows and Coords1.csv rows
   config   make_config.py       find and refine the tine tips (--update keeps every other setting;
                                 a test without test_config.json gets a new one, see --label)
+  branches review_branches.py   loading branch of each deformation (Stretch start to the rake peak) ->
+                                DIC_results/loading_branches.png; branches set by hand in the review
+                                window go to loading_branches.json (used by --loading-only and the fits)
+  thickness measure_interactive.py  wall thickness measured from the photos in <SAMPLE>/Thickness*/test N,
+                                in a window (review = yes): scale, frame, centerline, edges found and
+                                refined -> thickness_mm in test_config.json, <test>/thickness/. A test with a
+                                thickness asks whether to keep it; without photos, the thickness is typed
   scale    calibrate_scale.py   image scale from Def01 and Def19 (tine pairs in calibration_exclude
                                 of test_config.json are left out)
   widths   measure_tines.py     tine spans -> widths_mm in test_config.json
-  thickness measure_thickness.py thickness from the photos in <SAMPLE>/Thickness*/test N -> thickness_mm,
-                                for the stresses of the constitutive fit (run afterwards); in place of the
-                                workbook value (thickness = auto), or only for tests without one
-                                (thickness = workbook / --thickness workbook). Runs before tracking, so its
-                                overlays can be checked while tracking runs
   track    track_protocols.py   Def11-Def19 against the common reference, one job per deformation
   artifacts artifact_check.py   find local tracking errors (sliding particles, glare) at the Def11 peak; when
                                 one is confirmed, exclude it in test_config.json and track the test again
+  report   view_tracking.py     tracking quality of each deformation's loading branch (valid points, match
+                                quality: Good, Check or Problem) -> DIC_results/tracking_report.csv; with
+                                review = yes, the tracking report window of each test, before its figures
+                                and fit: with a deformation marked Check or Problem, proceed or stop the test
   jfig     peak_j_figure.py     peak J/mean figure per test (needs all of Def11-Def19 tracked)
   exports  compare_cellscale.py, export_fields.py, animate_fields.py for the --export-defs
   edge     edge_effects.py      tine-effect check across the tests given (all of Def11-Def19 tracked)
@@ -71,18 +81,22 @@ Options:
       --loading-only       track each deformation to the end of loading only (about 55% of the frames;
                            the loading frames are the same as in a full-cycle track)
       --full-cycle         track the full load-unload cycle (overrides loading_only = yes)
-      --status N           while tracking, print the progress of the running deformations every N s
-                           (default: 1; 0 turns it off)
+      --status N           while tracking, update the status every N s: a line for each finished
+                           deformation, and the progress of each running one redrawn in place (a count
+                           line each time when the output is not a terminal; the logs keep only the
+                           finished deformations) (default: 1; 0 turns it off)
   -e, --export-defs LIST   deformations to export (default: Def11)
   -l, --label TEXT         label for a new config, e.g. "labeled healthy"
-      --thickness SOURCE   auto (default): thickness measured from the photos for every test (a test whose
-                           photos give none keeps the workbook value); workbook: the sample's workbook,
-                           measured from the photos only where there is none
   -p, --python PATH        Python to use (default: .venv/bin/python)
       --setup              build .venv from requirements.txt first (needs python3 and python3-venv)
   -n, --dry-run            print the commands only
   -y, --yes                don't ask for confirmation
       --ask                ask for confirmation (overrides yes = yes)
+      --review             check windows, one test at a time: the sorting table (proceed or stop the
+                           test), the tine tips (click the rakes that are wrong) and the loading
+                           branches (click the wrong ones); the tracking report after tracking
+                           (default: review = yes)
+      --no-review          no check windows (overrides review = yes)
       --config FILE        read the settings from FILE instead of runDIC.mac.ini / runDIC.ubuntu.ini
   -h, --help               this help
 
@@ -136,9 +150,8 @@ read_config() {
       loading_only) v=$(yesno "$f" "$n" "$key" "$val") || exit 2
                     if [ "$v" = 1 ]; then LOADING_ONLY="--loading-only"; else LOADING_ONLY=""; fi ;;
       yes) YES="$(yesno "$f" "$n" "$key" "$val")" || exit 2 ;;
+      review) REVIEW="$(yesno "$f" "$n" "$key" "$val")" || exit 2 ;;
       label) LABEL="$val" ;;
-      thickness) case "$val" in workbook|auto) THICKNESS="$val" ;;
-                   *) echo "$f line $n: thickness must be workbook or auto"; exit 2 ;; esac ;;
       python) case "$val" in /*) PY="$val" ;; *) PY="$HERE/$val" ;; esac ;;
       *) echo "$f line $n: unknown setting '$key' (see runDIC.mac.ini or runDIC.ubuntu.ini)"; exit 2 ;;
     esac
@@ -167,12 +180,13 @@ while [ $# -gt 0 ]; do
     --full-cycle) LOADING_ONLY=""; shift ;;
     -e|--export-defs) EXPORT_DEFS="$(expand_defs "$2")"; shift 2 ;;
     -l|--label) LABEL="$2"; shift 2 ;;
-    --thickness) case "$2" in workbook|auto) THICKNESS="$2" ;; *) echo "--thickness must be workbook or auto"; exit 2 ;; esac; shift 2 ;;
     -p|--python) PY="$2"; shift 2 ;;
     --setup) SETUP=1; shift ;;
     -n|--dry-run) DRY=1; shift ;;
     -y|--yes) YES=1; shift ;;
     --ask) YES=0; shift ;;
+    --review) REVIEW=1; shift ;;
+    --no-review) REVIEW=0; shift ;;
     -h|--help) usage; exit 0 ;;
     -*) echo "unknown option $1 (see --help)"; exit 2 ;;
     *) TESTS+=("$1"); shift ;;
@@ -249,9 +263,9 @@ ndefs=$(echo $DEFS | wc -w | tr -d ' ')
 echo "Tests:   ${TESTS[*]}"
 echo "Config:  ${CONF#$HERE/}"
 echo "Steps:   $STEPS"
-has thickness && echo "Thickness: $([ "$THICKNESS" = auto ] && echo "measured from the photos (in place of workbook values)" || echo "workbook; measured from the photos where there is none")"
 has track && echo "Track:   $DEFS ($(( ${#TESTS[@]} * ndefs )) deformations, $JOBS at a time, $(( NCPU / JOBS > 1 ? NCPU / JOBS : 1 )) threads each${LOADING_ONLY:+, loading branch only})"
 has exports && echo "Exports: $EXPORT_DEFS"
+[ "$REVIEW" = 1 ] && { has info || has sort || has config || has branches || has thickness || has report; } && echo "Review:  windows for the label and notes, sorting, tine tips, loading branches and thickness, one test at a time; the tracking report after tracking"
 echo "Python:  $PY"
 [ "$DRY" = 1 ] && echo "(dry run: commands are printed, not run)"
 if [ "$DRY" = 0 ]; then
@@ -263,7 +277,13 @@ if [ "$DRY" = 0 ]; then
   STATE=$(mktemp -d)                    # failures list for the summary; removed at the end
   CONSOLE=()
   for t in "${TESTS[@]}"; do mkdir -p "$(tlogdir "$t")"; CONSOLE+=("$(tlogdir "$t")/runDIC.log"); done
-  exec > >(tee "${CONSOLE[@]}") 2>&1   # everything printed from here on also goes to each test's runDIC.log
+  LIVE=0                                 # in a terminal, the tracking status is redrawn in place
+  [ -t 1 ] && LIVE=1
+  # everything printed from here on also goes to each test's runDIC.log, without the redrawn status lines
+  # (marked \033[0m) and terminal codes
+  exec > >(tee >(perl -ne 'BEGIN { $| = 1 } next if /\e\[0m/; s/\e\[[0-9;?]*[A-Za-z]//g; s/\r//g; print' \
+                 | tee "${CONSOLE[@]}" > /dev/null)) 2>&1
+  trap 'printf "\033[?7h\n"; echo "stopped (Ctrl-C)"; kill ${status_pid:-} ${LIVE_PID:-} 2>/dev/null; rm -rf "$STATE"; exit 130' INT
   T_RUN=$SECONDS                         # runtime is counted from here (after the confirmation question)
 fi
 # each tracking job writes a progress line to its log this often, so the status line can be as current
@@ -271,7 +291,8 @@ DIC_PROGRESS_EVERY=$(( STATUS_EVERY > 0 && STATUS_EVERY < 10 ? STATUS_EVERY : 10
 # threads per job: the CPUs shared among the parallel jobs (dic2d.THREADS; each tracking job matches chunks
 # of its subsets in parallel, and OpenCV is limited to match)
 DIC_THREADS=$(( NCPU / JOBS > 1 ? NCPU / JOBS : 1 ))
-export DIC_PROGRESS=lines DIC_PROGRESS_EVERY DIC_THREADS PY DRY HERE STAMP STATE LOADING_ONLY
+DIC_REVIEW=$REVIEW                       # check windows in sort_images.py, make_config.py and review_branches.py
+export DIC_PROGRESS=lines DIC_PROGRESS_EVERY DIC_THREADS DIC_REVIEW PY DRY HERE STAMP STATE LOADING_ONLY
 export -f tlogdir
 
 # run NAME TEST CMD...: run one command with its own log in TEST's log folder (TEST empty: a cross-test step).
@@ -281,19 +302,25 @@ run() {
   local name="$1" t="$2"; shift 2
   if [ "$DRY" = 1 ]; then echo "  $*"; return 0; fi
   local dir tk="${t//\//_}"; dir=$(tlogdir "$t"); mkdir -p "$dir"
-  if [ -n "$t" ] && [ -e "$dir/FAILED" ]; then echo "  skip $name ($tk failed earlier)"; return 1; fi
-  local log="$dir/$name.log" t0=$SECONDS
-  if "$@" >"$log" 2>&1; then
-    echo "  ok    $name ${tk:+$tk }($(( SECONDS - t0 )) s)"
+  if [ -n "$t" ] && [ -e "$dir/FAILED" ]; then say "  skip $name ($tk failed earlier)"; return 1; fi
+  local log="$dir/$name.log" t0=$SECONDS rc=0
+  touch "$dir/$name.running"                    # shown in the live block while it runs (live_tick)
+  "$@" >"$log" 2>&1 || rc=$?
+  rm -f "$dir/$name.running"
+  if [ "$rc" = 0 ]; then
+    say "  ok    $name ${tk:+$tk }($(( SECONDS - t0 )) s)"
   else
-    echo "  FAIL  $name ${tk:+$tk }($(( SECONDS - t0 )) s): last lines of $log"
-    tail -n 5 "$log" | sed 's/^/        /'
+    say "  FAIL  $name ${tk:+$tk }($(( SECONDS - t0 )) s): last lines of $log"$'\n'"$(tail -n 5 "$log" | sed 's/^/        /')"
     [ -n "$t" ] && [ "${SOFT:-0}" != 1 ] && touch "$dir/FAILED"
     echo "$name ${tk:+$tk }($log)" >> "$STATE/failures.txt"
     return 1
   fi
 }
-export -f run
+# say TEXT: print a result line; while a live block is shown (live_begin), it is printed above the block
+say() {
+  if [ -n "${LIVE_LINES:-}" ]; then printf '%s\n' "$*" >> "$LIVE_LINES"; else printf '%s\n' "$*"; fi
+}
+export -f run say
 
 ST="$HERE/strain_tracking"
 step() { echo; echo "== $1  ($(date +%H:%M:%S))"; }
@@ -305,24 +332,104 @@ hms() {
   else printf "%d s" "$s"; fi
 }
 
-# track_status SECONDS: while tracking runs, print one line every SECONDS with the deformations finished
-# and the progress of each running one (read from the progress lines in its track_*.log)
+# status_tick [final]: one update of the tracking status, as in the MATLAB version. A deformation that has
+# finished gets a permanent line ("Def11 done in 3 min 07 s: valid per frame median 100.0%, min 99.7%");
+# below them, a block redrawn in place: the count, then each running deformation's last progress line
+# from its log (frames, percent, elapsed, time left, valid points, ZNCC). "final" prints the last finished
+# lines and clears the block. Without a terminal, a count line with the running deformations is printed
+# instead of the block.
+status_tick() {
+  local total=$(( ${#TESTS[@]} * ndefs )) done=0 f t tk d line last new="" running="" block=()
+  for t in "${TESTS[@]}"; do
+    tk=""; [ "${#TESTS[@]}" -gt 1 ] && tk="$(key "$t") "
+    for f in "$(tlogdir "$t")"/track_*.log; do
+      [ -e "$f" ] || continue
+      d=$(basename "$f" .log); d=${d#track_}
+      if grep -q "deformations tracked in\|Traceback" "$f"; then
+        done=$(( done + 1 ))
+        grep -qxF "$f" "$STATE/status_done" 2>/dev/null && continue
+        echo "$f" >> "$STATE/status_done"
+        line=$(grep -h "valid per frame" "$f" | tail -1)
+        if [ -n "$line" ]; then
+          new+="  $tk$d done in $(hms "$(echo "$line" | sed -E 's/.*tracked in ([0-9]+) s.*/\1/')"): $(echo "$line" | sed -E 's/.*(valid per frame [^;]*).*/\1/')"$'\n'
+        else
+          new+="  $tk$d FAILED: see ${f#$HERE/}"$'\n'
+        fi
+        continue
+      fi
+      last=$(grep -E "^  Def[0-9]+ +[0-9]+/[0-9]+ +[0-9]+%" "$f" | tail -1)
+      block+=("  $tk${last:-  $d  starting}")
+      running+="${running:+, }$tk$(echo "${last:-$d starting}" | awk '{print $1, $3}')"
+    done
+  done
+  local head="  [$(date +%H:%M:%S), $(( (SECONDS - T_TRACK) / 60 )) min] $done/$total deformations done"
+  if [ "$LIVE" != 1 ]; then
+    printf '%s' "$new"
+    [ "${1:-}" = final ] || echo "$head${running:+; running: $running}"
+    return
+  fi
+  if [ "${1:-}" = final ]; then live_draw "$new"; else live_draw "$new" "$head" ${block[@]+"${block[@]}"}; fi
+}
+# track_status SECONDS: status_tick every SECONDS while tracking runs, until $STATE/live_stop exists
 track_status() {
-  local every="$1" total=$(( ${#TESTS[@]} * ndefs )) t0=$SECONDS
-  [ "$every" -gt 0 ] 2>/dev/null || return 0
-  while sleep "$every"; do
-    local done=0 running="" f last tk
-    for t in "${TESTS[@]}"; do
-      tk=""; [ "${#TESTS[@]}" -gt 1 ] && tk="$(key "$t") "
-      for f in "$(tlogdir "$t")"/track_*.log; do
+  [ "$1" -gt 0 ] 2>/dev/null || return 0
+  until [ -e "$STATE/live_stop" ]; do sleep "$1"; [ -e "$STATE/live_stop" ] || status_tick; done
+}
+
+# live_draw NEW [LINE...]: print NEW (finished lines, permanent) and below it the block of LINEs, redrawn in
+# place: the previous block is cleared first. Line wrapping is off while the block is drawn (\033[?7l): a
+# line wider than the window is cut at its edge, so each takes one screen line whatever the window's width.
+# \033[0m marks the block's lines, which the logs leave out.
+live_draw() {
+  local new="$1" prev out="" line
+  shift
+  prev=$(cat "$STATE/live_prev" 2>/dev/null || echo 0)
+  [ "$prev" -gt 0 ] && out+=$(printf '\033[%dA' "$prev")
+  out+=$'\r\033[J'"$new"
+  if [ $# -gt 0 ]; then
+    out+=$'\033[?7l'
+    for line in "$@"; do out+=$'\033[0m'"$line"$'\n'; done
+    out+=$'\033[?7h'
+  fi
+  printf '%s' "$out"
+  echo "$#" > "$STATE/live_prev"
+}
+# live_tick [final]: the result lines said since the last call (say), and a block with each running job
+# (run): its name, how long it has run and the last line of its log
+live_tick() {
+  local off n new="" t tk d f name m now line block=()
+  off=$(cat "$STATE/live_off" 2>/dev/null || echo 0); n=$(wc -l < "$LIVE_LINES" | tr -d ' ')
+  [ "$n" -gt "$off" ] && new="$(sed -n "$(( off + 1 )),${n}p" "$LIVE_LINES")"$'\n'
+  echo "$n" > "$STATE/live_off"
+  if [ "${1:-}" != final ]; then
+    now=$(date +%s)
+    for t in "${TESTS[@]}" ""; do
+      tk=""; [ "${#TESTS[@]}" -gt 1 ] && [ -n "$t" ] && tk="$(key "$t") "
+      d=$(tlogdir "$t")
+      for f in "$d"/*.running; do
         [ -e "$f" ] || continue
-        if grep -q "deformations tracked in\|Traceback" "$f"; then done=$(( done + 1 )); continue; fi
-        last=$(grep -E "^  Def[0-9]+ +[0-9]+/[0-9]+ +[0-9]+%" "$f" | tail -1 | awk '{print $1, $3}')
-        running+="${running:+, }$tk${last:-$(basename "$f" .log | sed 's/track_//') starting}"
+        name=$(basename "$f" .running)
+        m=$(stat -c %Y "$f" 2>/dev/null || stat -f %m "$f")
+        line=$(tail -c 3000 "$d/$name.log" 2>/dev/null | tr '\r' '\n' | grep -v '^[[:space:]]*$' | tail -1 | sed 's/^[[:space:]]*//')
+        block+=("    $tk$name  ($(hms $(( now - m ))))  $line")
       done
     done
-    echo "  [$(date +%H:%M:%S), $(( (SECONDS - t0) / 60 )) min] $done/$total done${running:+; running: $running}"
-  done
+  fi
+  live_draw "$new" ${block[@]+"${block[@]}"}
+}
+# live_begin / live_end: around a step's jobs, in a terminal: the live block every second, result lines above it
+live_begin() {
+  [ "$LIVE" = 1 ] && [ "$DRY" = 0 ] || return 0
+  export LIVE_LINES="$STATE/live_lines"
+  : > "$LIVE_LINES"; echo 0 > "$STATE/live_off"; echo 0 > "$STATE/live_prev"; rm -f "$STATE/live_stop"
+  ( until [ -e "$STATE/live_stop" ]; do sleep 1; [ -e "$STATE/live_stop" ] || live_tick; done ) &
+  LIVE_PID=$!
+}
+live_end() {
+  [ -n "${LIVE_PID:-}" ] || return 0
+  touch "$STATE/live_stop"; wait "$LIVE_PID" 2>/dev/null       # lets a redraw under way finish
+  live_tick final
+  rm -f "$STATE/live_stop"; unset LIVE_LINES LIVE_PID
 }
 # track_of TEST DEF: path of the deformation's full-domain track, <test>/DIC_results/<deformation folder>.npz
 track_of() {
@@ -343,13 +450,26 @@ all_tracked() {
   done
 }
 
+if has info; then
+  step "label and notes$([ "$REVIEW" = 1 ] && echo "  (a window for each test)")"
+  live_begin
+  for t in "${TESTS[@]}"; do
+    if [ "$REVIEW" = 1 ]; then SOFT=1 run info "$t" "$PY" "$ST/sample_info.py" --test "$t"
+    else say "  skip  info $(key "$t"): asked in a window (review = yes)"; fi
+  done
+  live_end
+fi
+
 if has sort; then
-  step "sort images"
+  step "sort images$([ "$REVIEW" = 1 ] && echo "  (a window shows each test's folders)")"
+  live_begin
   for t in "${TESTS[@]}"; do run sort "$t" "$PY" "$ST/sort_images.py" --test "$t"; done
+  live_end
 fi
 
 if has config; then
-  step "test_config.json (tine tips)"
+  step "test_config.json (tine tips)$([ "$REVIEW" = 1 ] && echo "  (a window shows each test's tips)")"
+  live_begin
   for t in "${TESTS[@]}"; do
     s=${t%%/*}; n=${t##*/}
     if ls "$HERE"/"$s"*/"$n"_*/test_config.json >/dev/null 2>&1; then
@@ -360,30 +480,44 @@ if has config; then
       run config "$t" "$PY" "$ST/make_config.py" --test "$t"
     fi
   done
+  live_end
+fi
+
+if has branches; then
+  step "loading branches$([ "$REVIEW" = 1 ] && echo "  (a window shows each test's branches)")"
+  live_begin
+  for t in "${TESTS[@]}"; do run branches "$t" "$PY" "$ST/review_branches.py" --test "$t" --defs $DEFS; done
+  live_end
+fi
+
+if has thickness; then
+  step "thickness from the photos$([ "$REVIEW" = 1 ] && echo "  (a window for each test)")"
+  live_begin
+  for t in "${TESTS[@]}"; do
+    if [ "$REVIEW" = 1 ]; then
+      SOFT=1 run thickness "$t" "$PY" "$HERE/thickness/measure_interactive.py" --test "$t" \
+        && [ "$DRY" = 0 ] && say "        $(tail -1 "$(tlogdir "$t")/thickness.log")"
+    else
+      say "  skip  thickness $(key "$t"): measured in a window (review = yes)"
+    fi
+  done
+  live_end
 fi
 
 if has scale; then
   step "scale calibration"
+  live_begin
   for t in "${TESTS[@]}"; do run scale "$t" "$PY" "$ST/calibrate_scale.py" --test "$t"; done
+  live_end
 fi
 
 if has widths; then
   step "tine spans"
+  live_begin
   for t in "${TESTS[@]}"; do run widths "$t" "$PY" "$ST/measure_tines.py" --test "$t" --write; done
+  live_end
 fi
 
-if has thickness; then
-  step "thickness from the photos ($([ "$THICKNESS" = auto ] && echo "in place of workbook values" || echo "where there is no workbook value"))"
-  for t in "${TESTS[@]}"; do
-    n=${t##*/test}; photos=""
-    for d in "$HERE"/"${t%%/*}"*/Thickness*/*/; do      # <SAMPLE>/Thickness, <ID>/test <N> or test<N>
-      b=$(basename "$d"); [[ "$b" =~ ^[Tt]est[[:space:]]*0*$n$ ]] && photos="${d%/}"
-    done
-    if [ -z "$photos" ]; then echo "  skip  thickness $(key "$t"): no thickness photo folder"; continue; fi
-    SOFT=1 run thickness "$t" "$PY" "$HERE/thickness/measure_thickness.py" "$photos" --write \
-      $([ "$THICKNESS" = workbook ] && echo --keep-workbook)
-  done
-fi
 
 if has track; then
   step "tracking ($JOBS jobs at a time; one log per deformation)"
@@ -395,13 +529,16 @@ if has track; then
   if [ "$DRY" = 1 ]; then
     for t in "${TESTS[@]}"; do for d in $DEFS; do track_one "$t" "$d"; done; done
   else
+    T_TRACK=$SECONDS
+    echo 0 > "$STATE/live_prev"; rm -f "$STATE/live_stop"
     track_status "$STATUS_EVERY" &
     status_pid=$!
-    t_track=$SECONDS
+    # in a terminal the status reports each finished deformation, so the jobs' own ok lines are left out
     for t in "${TESTS[@]}"; do for d in $DEFS; do echo "$t $d"; done; done \
-      | xargs -P "$JOBS" -L 1 bash -c 'track_one "$0" "$1"'
-    kill "$status_pid" 2>/dev/null; wait "$status_pid" 2>/dev/null
-    echo "  tracking finished in $(hms $(( SECONDS - t_track )))"
+      | xargs -P "$JOBS" -L 1 bash -c 'track_one "$0" "$1"' | { if [ "$LIVE" = 1 ]; then cat > /dev/null; else cat; fi; }
+    touch "$STATE/live_stop"; wait "$status_pid" 2>/dev/null; rm -f "$STATE/live_stop"
+    status_tick final
+    echo "  tracking finished in $(hms $(( SECONDS - T_TRACK )))"
     for t in "${TESTS[@]}"; do      # a test with a failed deformation is not passed on to later steps
       d=$(tlogdir "$t")
       ls "$d"/track_*.log >/dev/null 2>&1 || continue
@@ -428,8 +565,10 @@ if has artifacts; then
   done
   if [ ${#RETRACK[@]} -gt 0 ]; then
     step "tracking again with the new exclusions: ${RETRACK[*]}"
+    live_begin
     for t in "${RETRACK[@]}"; do for d in $DEFS; do echo "$t $d"; done; done \
       | xargs -P "$JOBS" -L 1 bash -c 'OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 run "retrack_$1" "$0" "$PY" "$HERE/strain_tracking/track_protocols.py" --test "$0" --defs "$1" $LOADING_ONLY'
+    live_end
     for t in "${RETRACK[@]}"; do
       SOFT=1 run artifacts_recheck "$t" "$PY" "$ST/artifact_check.py" --test "$t" --report-only
       grep -h "CONFIRMED" "$(tlogdir "$t")/artifacts_recheck.log" >/dev/null 2>&1 \
@@ -438,20 +577,38 @@ if has artifacts; then
   fi
 fi
 
+if has report; then
+  step "tracking report$([ "$REVIEW" = 1 ] && echo "  (a window for each test, before its figures and fit)")"
+  live_begin
+  for t in "${TESTS[@]}"; do
+    if [ "$DRY" = 0 ] && ! ls "$(dirname "$(dirname "$(tlogdir "$t")")")"/DIC_results/Def*.npz >/dev/null 2>&1; then
+      say "  skip  report $(key "$t"): no tracks"; continue
+    fi
+    # a failure here (or "Stop this test" in the window) skips the test's figures, exports and fit
+    run report "$t" "$PY" "$ST/view_tracking.py" --test "$t" --defs $DEFS \
+      $([ "$REVIEW" = 1 ] && echo --ask || echo --no-window) \
+      && [ "$DRY" = 0 ] && say "        $(grep -h '^Tracking:' "$(tlogdir "$t")/report.log" | sed 's/ -> .*//')"
+  done
+  live_end
+fi
+
 if has jfig; then
   step "peak J/mean figures"
+  live_begin
   for t in "${TESTS[@]}"; do
     if all_tracked "$t"; then SOFT=1 run jfig "$t" "$PY" "$ST/peak_j_figure.py" --test "$t"
-    else echo "  skip  jfig $(key "$t"): needs the tracks of all of Def11-Def19"; fi
+    else say "  skip  jfig $(key "$t"): needs the tracks of all of Def11-Def19"; fi
   done
+  live_end
 fi
 
 if has exports; then
   step "exports ($EXPORT_DEFS)"
+  live_begin
   export_one() {   # TEST DEF: CellScale comparison first, so the animations include the force traces
     local t="$1" d="$2" npz
     npz=$(track_of "$t" "$d")
-    if [ -z "$npz" ] && [ "$DRY" = 0 ]; then echo "  FAIL  exports ${t//\//_} $d: no track"; return 1; fi
+    if [ -z "$npz" ] && [ "$DRY" = 0 ]; then say "  FAIL  exports ${t//\//_} $d: no track"; return 1; fi
     npz=${npz:-<track of $t $d>}
     SOFT=1 run "cellscale_$d" "$t" "$PY" "$HERE/strain_tracking/compare_cellscale.py" "$npz" &&
     SOFT=1 run "fields_$d" "$t" "$PY" "$HERE/strain_tracking/export_fields.py" "$npz" &&
@@ -464,6 +621,7 @@ if has exports; then
     for t in "${TESTS[@]}"; do for d in $EXPORT_DEFS; do echo "$t $d"; done; done \
       | xargs -P "$JOBS" -L 1 bash -c 'export_one "$0" "$1"'
   fi
+  live_end
 fi
 
 OK_TESTS=()      # tests that passed every prerequisite step and have all of Def11-Def19 tracked
@@ -477,17 +635,22 @@ fi
 
 if has edge && [ ${#OK_TESTS[@]} -gt 0 ]; then
   step "edge-effect check"
+  live_begin
   SOFT=1 run edge "" "$PY" "$ST/edge_effects.py" --tests "${OK_TESTS[@]}"
+  live_end
 fi
 
 if has compare && [ ${#OK_TESTS[@]} -gt 0 ]; then
   step "cross-test comparison"
+  live_begin
   OK_SAMPLES=$(for t in "${OK_TESTS[@]}"; do echo "${t%%/*}"; done | awk '!seen[$0]++' | tr '\n' ' ')
   SOFT=1 run compare "" "$PY" "$ST/compare_peak_j.py" --samples $OK_SAMPLES
+  live_end
 fi
 
 if has fit; then
   step "constitutive fits (four-fiber model, every stretch input, protocol bootstrap)"
+  live_begin
   fit_one() {   # TEST: bulk fit -> <test>/constitutive_fit/
     SOFT=1 run fit "$1" "$PY" "$HERE/constitutive_fit/compare_stretch_inputs.py" --test "$1"
   }
@@ -495,10 +658,10 @@ if has fit; then
   FIT_TESTS=()
   for t in "${TESTS[@]}"; do
     if [ "$DRY" = 0 ]; then
-      [ -e "$(tlogdir "$t")/FAILED" ] && { echo "  skip  fit $(key "$t") (failed earlier)"; continue; }
-      all_tracked "$t" || { echo "  skip  fit $(key "$t"): not all of Def11-Def19 tracked"; continue; }
+      [ -e "$(tlogdir "$t")/FAILED" ] && { say "  skip  fit $(key "$t") (failed earlier)"; continue; }
+      all_tracked "$t" || { say "  skip  fit $(key "$t"): not all of Def11-Def19 tracked"; continue; }
       grep -q '"thickness_mm"' "$(dirname "$(dirname "$(tlogdir "$t")")")/test_config.json" 2>/dev/null \
-        || { echo "  skip  fit $(key "$t"): no thickness_mm in test_config.json"; continue; }
+        || { say "  skip  fit $(key "$t"): no thickness_mm in test_config.json"; continue; }
     fi
     FIT_TESTS+=("$t")
   done
@@ -511,6 +674,7 @@ if has fit; then
       "$PY" "$HERE/constitutive_fit/compare_stretch_inputs.py" --test "$t" --plot-only > /dev/null 2>&1
     done
   fi
+  live_end
 fi
 
 [ "$DRY" = 1 ] && exit 0
@@ -533,10 +697,12 @@ if has fit; then
   done
 fi
 echo "logs: <test folder>/DIC_logs/run_$STAMP/"
+rc=0
 if [ -s "$STATE/failures.txt" ]; then
-  echo "FAILED steps:"; sed 's/^/  /' "$STATE/failures.txt"; rm -rf "$STATE"
-  echo "total runtime: $(hms $(( SECONDS - T_RUN )))  (finished $(date '+%Y-%m-%d %H:%M:%S'))"; exit 1
+  echo "FAILED steps:"; sed 's/^/  /' "$STATE/failures.txt"; rc=1
+else
+  echo "all steps finished"
 fi
 rm -rf "$STATE"
-echo "all steps finished"
 echo "total runtime: $(hms $(( SECONDS - T_RUN )))  (finished $(date '+%Y-%m-%d %H:%M:%S'))"
+exit $rc

@@ -94,7 +94,7 @@ classdef util
 
         function [t0, t1, byHand] = loadingBranch(testRoot, n, P, D)
             % Loading branch of deformation n (s): the Stretch start to the rake peak, or the start and end
-            % set by hand in the test's loading_branches.json (reviewBranches).
+            % set by hand in the test's loading_branches.json, when it has one.
             [t0, tRec] = util.stretchPhase(P, n);
             t1 = util.rakePeak(D, t0, tRec, 2.0);
             byHand = false;
@@ -143,11 +143,10 @@ classdef util
             end
         end
 
-        function [H, src] = thickness(testRoot, settings)
-            % Thickness (mm) for the stresses: settings.thickness_mm, else thickness_mm.H of the test's
-            % test_config.json (written by the thickness step or window, or by the Python pipeline), else NaN.
+        function [H, src] = thickness(testRoot, ~)
+            % Thickness (mm) for the stresses: thickness_mm.H of the test's test_config.json (written by
+            % the thickness window, or by the Python pipeline), else NaN.
             H = NaN; src = 'not set';
-            if ~isempty(settings.thickness_mm), H = settings.thickness_mm; src = 'given to runDIC'; return; end
             [t, s] = util.savedThickness(testRoot);
             if ~isempty(t), H = t.H; src = 'test_config.json'; if ~isempty(s), src = [src ', ' s]; end; end
         end
@@ -163,6 +162,61 @@ classdef util
                 t = cfg.thickness_mm;
                 if isfield(t, 'source'), src = t.source; end
             end
+        end
+
+        function s = defList(defs)
+            % 'Def11-Def19', 'Def01, Def11-Def15, Def19': runs of consecutive deformations.
+            parts = {}; k = 1;
+            while k <= numel(defs)
+                j = k; while j < numel(defs) && defs(j + 1) == defs(j) + 1, j = j + 1; end
+                if j > k, parts{end + 1} = sprintf('Def%02d-Def%02d', defs(k), defs(j)); %#ok<AGROW>
+                else, parts{end + 1} = sprintf('Def%02d', defs(k)); end %#ok<AGROW>
+                k = j + 1;
+            end
+            s = strjoin(parts, ', ');
+        end
+
+        function h = button(parent, label, pos, callback, varargin)
+            % A push button the size of MATLAB's own dialogs' (listdlg): default font, 22 px tall, as wide as its
+            % label. pos = [x y] (pixels, lower left), or [x y w] for a set width.
+            h = uicontrol(parent, 'Style', 'pushbutton', 'Units', 'pixels', 'String', label, 'Callback', callback, ...
+                          'Position', [pos(1:2) 70 22], varargin{:});
+            if numel(pos) > 2, set(h, 'Position', [pos(1:3) 22]); else, util.fitButton(h); end
+        end
+
+        function hs = buttonRow(parent, labels, callbacks, xRight, y)
+            % Buttons (util.button) side by side, 8 px apart, the last one ending at xRight (pixels).
+            hs = gobjects(1, numel(labels)); x = xRight;
+            for k = numel(labels):-1:1
+                hs(k) = util.button(parent, labels{k}, [0 y], callbacks{k});
+                p = get(hs(k), 'Position'); x = x - p(3); p(1) = x; set(hs(k), 'Position', p); x = x - 8;
+            end
+        end
+
+        function centerRow(hs, xCenter)
+            % Move a row of buttons (pixels) sideways so that it is centered on xCenter.
+            p = cell2mat(get(hs(:), 'Position'));
+            dx = xCenter - (min(p(:, 1)) + max(p(:, 1) + p(:, 3))) / 2;
+            for k = 1:numel(hs), set(hs(k), 'Position', p(k, :) + [dx 0 0 0]); end
+        end
+
+        function fitButton(h)
+            % Width of a push button to its label (at least 70 px), height 22 px; the left edge stays.
+            u = get(h, 'Units'); set(h, 'Units', 'pixels');
+            e = get(h, 'Extent'); p = get(h, 'Position');
+            set(h, 'Position', [p(1:2) max(70, ceil(e(3)) + 24) 22]); set(h, 'Units', u);
+        end
+
+        function answer(fig, a)
+            % A button of a question window (or closing it): keep the answer in its UserData and let the
+            % code waiting on it (uiwait) go on.
+            set(fig, 'UserData', a);
+            uiresume(fig);
+        end
+
+        function cancel(where)
+            % Stop the whole run (runDIC catches it): the user chose Cancel the run, or closed a question.
+            error('runDIC:cancelled', 'cancelled at %s', where);
         end
 
         function setThickness(testRoot, H, source, sd)

@@ -35,16 +35,19 @@ planarDIC/
     └── test<N>_<date>_<protocol>/       e.g. test1_08252026_PLC25_38-20
         ├── test_config.json             this test's settings (below)
         ├── scale_calibration.json       image scale (calibrate_scale.py)
+        ├── loading_branches.json        loading branches set by hand (review_branches.py; also the MATLAB version)
         ├── Coords1.csv, *Data.csv, *.tst, Logs/   CellScale output
         ├── DIC_logs/run_<date>_<time>/     runDIC.sh logs for this test
         ├── DIC_results/              tracks (DefNN_*.npz), exports and figures, named by deformation;
         │                                config_tine_tips, scale_calibration, artifact_check, peak_J_over_mean
         ├── constitutive_fit/            fit outputs for this test (see constitutive_fit/README.md)
-        ├── stress_stretch/, thickness/  written by the MATLAB version, as are its tracks
+        ├── thickness/                   the thickness measured from the photos (stations, summary, overlays)
+        ├── stress_stretch/              written by the MATLAB version, as are its tracks
         │                                (DIC_results/DefNN_*.mat; see matlab/README.md)
         └── Images/
             ├── Def01_… / … Def19_…/     images, one folder per load–unload cycle (sort_images.py)
-            └── sort_manifest.csv        old → new path for every sorted image
+            ├── sort_manifest.csv        old → new path for every sorted image
+            └── sort_summary.csv         images, Data.csv rows and Coords1.csv rows missing per folder
 ```
 
 A test folder name must start with `test`, a number and `_`. Outputs always go inside the test
@@ -96,7 +99,7 @@ figure and .csv states the interior it used.
 | `widths_mm.tine_span` | [w_θ, w_z] in mm, the load-bearing widths in the stress: w_θ divides F_z, w_z divides F_θ; means of the opposing rakes' spans | `measure_tines.py --write` |
 | `widths_mm.tine_span_by_rake` | each rake's span (mm); opposing rakes differ because the tines are bent and applied unevenly | `measure_tines.py --write` |
 | `widths_mm.specimen` | [w_θ, w_z] of the whole specimen (mm), for the specimen-width sensitivity check | by hand |
-| `thickness_mm` | `H`, `H_sd` (mm) and their `source`; `workbook`, the workbook value the photo measurement replaced | `measure_thickness.py --write`, from the photos (the pipeline's `thickness` step); `make_config.py` first fills it from the sample's thickness workbook (mean and sample SD of the test's readings), which stays where the photos give none or with `thickness = workbook`; or by hand |
+| `thickness_mm` | `H`, `H_sd` (mm) and their `source` (the photos, strips and positions measured, or `typed`) | the `thickness` step: `thickness/measure_interactive.py`, measured from the photos in its window, or typed in it (e.g. from the thickness workbook); or by hand |
 | `reference_deformation` | protocol whose first frame is the common reference (`Def11`) | `make_config.py` |
 | `dic.mask_saturated` | `true` to leave saturated glint pixels out of DIC matching | `make_config.py`: on when the tissue in the rest frame has saturated glints, off when it has none or is overexposed (≥ 10% saturated) |
 | `dic.exclude_px` | rectangles [x0, y0, x1, y1] (reference-frame px) left out of DIC matching, e.g. a speckle particle that slides over the tissue or a glare patch whose edges move with load. The rectangles move with the tracked tissue; neighboring subsets track on the remaining pixels | `artifact_check.py`, for confirmed tracking artifacts; or by hand |
@@ -121,13 +124,16 @@ Runs the whole analysis for the tests given, from sorting the images to the cons
 
 | Step | Script | Does |
 |---|---|---|
-| `sort` | `sort_images.py` | sorts the images into Def01–Def19 folders (safe to re-run) |
+| `info` | `sample_info.py` | the label and notes of each test, in a window filled in with what is saved → `sample`, `notes` |
+| `sort` | `sort_images.py` | sorts the images into Def01–Def19 folders (safe to re-run) and checks every folder for missing images, Data.csv rows and Coords1.csv rows → `Images/sort_summary.csv` |
 | `config` | `make_config.py` | finds and refines the tine tips; with an existing config (`--update`) every other setting is kept |
+| `branches` | `review_branches.py` | loading branch of each deformation, from the Stretch start to the rake peak → `DIC_results/loading_branches.png`; branches set by hand in its window → `loading_branches.json`, used by `--loading-only` tracking and the fits |
+| `thickness` | `measure_interactive.py` | wall thickness for the stresses, measured from the photos in `<SAMPLE>/Thickness, <ID>/test <N>` in a window (see "Thickness from photos") → `thickness_mm`, `<test>/thickness/`; a test that has a thickness is asked whether to keep it; without photos, it is typed |
 | `scale` | `calibrate_scale.py` | image scale from Def01 and Def19, leaving out `calibration_exclude` |
 | `widths` | `measure_tines.py --write` | tine spans → `widths_mm` |
-| `thickness` | `measure_thickness.py --write` | thickness for the stresses, from the photos in `<SAMPLE>/Thickness, <ID>/test <N>` → `thickness_mm`, in place of the workbook value (`thickness = auto`, the default), or only where there is no workbook value (`thickness = workbook`, `--thickness workbook`); runs before tracking, so its overlays can be checked while tracking runs |
 | `track` | `track_protocols.py` | Def11–Def19 against the common reference, one job per deformation, several at a time |
 | `artifacts` | `artifact_check.py` | finds local tracking errors (a sliding speckle particle, a shifting glare patch) at the Def11 peak, confirms each against independent patch matching, excludes it in `test_config.json` and tracks that test again |
+| `report` | `view_tracking.py` | tracking quality of each deformation's loading branch (worst frame's valid points and median ZNCC: Good, Check or Problem) → `DIC_results/tracking_report.csv`, with a verdict line on screen; with `review = yes` the tracking report window of each test opens here, before its figures and fit, and a test with a deformation marked Check or Problem can be stopped (its figures, exports and fit are then skipped) |
 | `jfig` | `peak_j_figure.py` | peak J/mean figure per test |
 | `exports` | `compare_cellscale.py`, `export_fields.py`, `animate_fields.py` | CellScale comparison, field exports and animations for Def11 |
 | `edge` | `edge_effects.py` | tine-effect check across the tests run |
@@ -146,10 +152,32 @@ Runs the whole analysis for the tests given, from sorting the images to the cons
 
 Each computer's defaults live in its settings file: `runDIC.mac.ini` on macOS and
 `runDIC.ubuntu.ini` on Linux (tests, steps, jobs, deformations, status interval, loading-only,
-confirmation, thickness source). `runDIC.sh` picks the file from the operating system; both are tracked by git, so
+confirmation, windows). `runDIC.sh` picks the file from the operating system; both are tracked by git, so
 they can be edited on either computer and committed like code. Options on the command line override it
 for one run (`--full-cycle` and `--ask` undo `loading_only = yes` and `yes = yes`); without tests on the
 command line, its `tests` are run. `--config FILE` reads another settings file.
+
+With `review = yes` (the default; `--no-review` turns it off for one run), windows open for each test, one
+test at a time, before anything runs in parallel: first the label and notes (`info`), filled in with what
+is saved. After sorting, a table lists every
+Def folder with its images and the frames missing from the tester's files (images, `Data.csv` rows,
+`Coords1.csv` rows); folders missing anything are red, with the times of the missing frames and whether
+they fall in loading or unloading, and the window asks whether to proceed. A few
+missing frames (up to about 5 in a folder) are normal; "No, stop this test" skips the test's later
+steps. After the tine tips are found, they are shown over the rest frame with the question whether every
+red circle is on a tine tip; a rake that is off is clicked again with its button ("Click LEFT again", ...; 5 tips, kept as clicked),
+as is a rake that fails the tip finder's self-check. Then the rake forces of Def11–Def19 are shown with
+each loading branch shaded, with the question whether each band covers one loading curve, from where
+the forces start to rise to where they peak; for the protocols answered wrong, the start and end are
+clicked (A goes back to the automatic branch). Then the thickness is measured from the photos (see
+"Thickness from photos"). After tracking and the artifact check, before any figure or fit, the tracking
+report of each test opens: the deformations side by side with the tracked points over the images, played back together by
+percent of their loading branch, each marked Good, Check or Problem, and opened at the worst frame of the
+worst one (`view_tracking.py --test SAMPLE/testN` opens it again at any time). When a deformation is
+marked Check or Problem, closing it asks whether to proceed with that test or stop it, so poorly tracked
+data is not fitted; a stopped test's figures, exports and fit are skipped. In the click windows the scroll wheel zooms and a
+right-click or Backspace removes the last click. On Linux the windows need Tk (`sudo apt install
+python3-tk`).
 
 A bare sample name (`N1739`) runs all its tests. The script prints the plan and asks before
 starting (`--yes` skips the question), writes each test's logs to `<test folder>/DIC_logs/run_<date>_<time>/` (one file per step, plus
@@ -179,20 +207,19 @@ track records `branch`, and `strain_tracking/status.py` marks loading-only track
 1. **Copy the CellScale output** into `<SAMPLE>/test<N>_…/`: `*Data.csv`, `Coords1.csv`, the `.tst` file,
    `Logs/` (with `*_PhaseTiming.csv`) and the images in `Images/`; and the thickness photos into
    `<SAMPLE>/Thickness, <ID>/test <N>/`.
-2. **Sort the images:** `sort_images.py --test SAMPLE/testN --dry-run`, then without `--dry-run`.
+2. **Sort the images:** `sort_images.py --test SAMPLE/testN --dry-run`, then without `--dry-run`
+   (`--review` shows the completeness table and asks whether to proceed).
 3. **Draft `test_config.json`:** `make_config.py --test SAMPLE/testN --label "labeled healthy"` finds the
    20 tine tips in the Def11 rest frame, refines them with the calibration's tip finder and writes the
-   tip lines, ROIs and label. Check `DIC_results/config_tine_tips.png`. If its
-   self-check fails it writes nothing: enter the flagged rake's tines in a config by hand (within about
-   20 px) and run it again with `--update`, which refines them.
+   tip lines, ROIs and label. Check `DIC_results/config_tine_tips.png`, or run it with `--review` to be
+   shown the tips and click the rakes that are wrong. If its self-check fails it writes nothing, unless
+   `--review` is given: then the flagged rake's tips are clicked.
 4. **Calibrate the scale:** `calibrate_scale.py --test SAMPLE/testN` (Def01 and Def19). Tine pairs that
    disagree with the rest are left out by its outlier rule and listed; check `scale_calibration.png`.
    `calibration_exclude` in the config overrides the rule.
 5. **Measure the tine spans:** `measure_tines.py --test SAMPLE/testN --write` → `widths_mm`.
-6. **Thickness:** `measure_thickness.py --recursive --write "<SAMPLE>/Thickness, <ID>"` measures the photos
-   and writes each test's thickness, in place of the workbook value `make_config.py` entered
-   (`--keep-workbook`: workbook values stay, the photos fill only tests without one). Only the stresses
-   (step 9) use it, but it runs here, before tracking, so its overlays can be checked while tracking runs.
+6. **Thickness:** `thickness/measure_interactive.py --test SAMPLE/testN` measures it from the photos in a
+   window (see "Thickness from photos") → `thickness_mm`. Only the stresses (step 9) use it.
 7. **Track:** `track_protocols.py --test SAMPLE/testN` (Def11–Def19; `--loading-only` for the loading
    branches only, which is all the fits use), then `artifact_check.py --test SAMPLE/testN`: if it adds an
    excluded region (exit status 3), track the test again.
@@ -206,11 +233,48 @@ track records `branch`, and `strain_tracking/status.py` marks loading-only track
    input, with a protocol-level bootstrap → `<test>/constitutive_fit/` (parameters, `fit_stress_stretch_<input>.png`).
    See `constitutive_fit/README.md`.
 
-Steps 2–9 are what `runDIC.sh` runs, in this order (the fits of a sample's tests run at once, about
-0.5–2 min each). To fit one test on its own, run step 9's command.
+Steps 2–9 are what `runDIC.sh` runs, after the label and notes window and with the thickness (step 6)
+moved up to follow the loading branches, so that its windows come first (the fits of a sample's tests run
+at once, about 0.5–2 min each). To fit one test on its own, run step 9's command.
 
-## Thickness from photos: `thickness/measure_thickness.py`
+## Thickness from photos: `thickness/measure_interactive.py`
 
+The wall thickness is measured from the photos of the test's strips (`<SAMPLE>/Thickness, <ID>/test <N>/`,
+the strips lying on their cut face on the blue mat or the steel ruler), in a window, with the same steps
+as the MATLAB version (its edge finding, `thickness/strip_edges.py`, gives the same positions and
+thicknesses as MATLAB's to 1e-6 mm). Each photo is opened in turn; the scroll wheel zooms where the
+pointer is, and the cursor is a crosshair over the photo.
+
+1. **Scale, 1 grid spacing.** Click on one grid line and then on the next, straight across one grid
+   spacing (or one ruler tick), and type its size with its unit (a mat square is 0.5 in); the size is
+   remembered.
+2. **Scale check.** Click on a grid line near the strip and then on another one as far away as the photo
+   allows; the grid spacings between them are counted with the spacing from step 1 and shown with the
+   scale, to confirm. This longer line sets the scale; a count that is not a whole number means a click
+   is off a grid line, and the line is drawn again.
+3. **Crop** an ROI around the strip with two opposite corners (or "No crop"); the view then stays on it.
+4. **Trace the centerline.** Click along the middle of the strip, end to end, and press Done (or double-click the
+   last point). The edges are found automatically: from each position along the centerline (every
+   0.1 mm), the tissue's color against the mat's, out to 3 mm either side; then the centerline is moved
+   between the edges and the strip measured again.
+5. **Check the thickness measurements.** A red chord at every position used, edge to edge. Orange positions are far from the rest
+   (a loose fiber, a cut end) and left out automatically. "Remove a section", "Redraw the centerline",
+   "Click the edges myself" (one edge, then the other) or "Skip this strip" if the chords are wrong.
+
+A strip needs at least 10 positions. Right-click or Backspace removes the last click; a double-click or
+Enter proceeds as the step's first button does. The thickness is the mean of every position used, all
+strips of all photos together, saved in `test_config.json` as `thickness_mm` (`H`, `H_sd`, `source`),
+with `<test>/thickness/`: `stations.csv` (every position, used or why not), `summary.csv` (per strip,
+with its scale and frame) and an overlay per photo. Closing the window saves nothing; a test without a
+thickness then gets a box to type one, as does a test without photos (the source is then `typed`).
+
+```bash
+.venv/bin/python thickness/measure_interactive.py --test N1757/test1
+```
+
+### Automatic measurement: `thickness/measure_thickness.py`
+
+Not used by `runDIC.sh`: it finds the strips and the scale on its own, for comparing many photos at once.
 Measures the wall thickness of the strips in the `Thickness, …` photos, which is the width of the
 tissue band, at stations every 0.1 mm along its centerline (10% trimmed at each end).
 The scale comes from the background: the 0.5 in grid of the blue mat, or the mm edge of the steel
@@ -240,8 +304,7 @@ lists the photos used and those left out with the reason (excluded, failed, no c
 uncertain), or says that the test got no thickness (the config then keeps what it has, such as the
 workbook value). A workbook value it replaces is kept in `thickness_mm.workbook`, and the log shows the
 difference. With `--keep-workbook`, workbook values stay in use (one kept in `thickness_mm.workbook` is
-put back) and the photos fill only tests without one. The pipeline's `thickness` step runs it for each
-test (`thickness = auto`, the default, or `workbook` in the settings file).
+put back) and the photos fill only tests without one.
 
 On the steel ruler the tissue is told from the steel by brightness alone (wet films on the steel look
 warm), with the edge `RULER_EDGE_FRAC` of the way from the steel's brightness to the tissue's.
@@ -287,7 +350,11 @@ written every 30 s (`DIC_PROGRESS_EVERY` sets the interval). `DIC_PROGRESS=lines
 `DIC_PROGRESS=0` turns the line off.
 
 `runDIC.sh` tracks each deformation as its own job with its own log, so the per-frame lines go to
-the logs. While tracking runs it prints a status line every second (`--status N` for every N s; 0 turns
-it off) with the deformations finished and the percent done of each running one; each job's log is
-updated as often (at most every 10 s). It prints the total tracking time when tracking ends, and the total
+the logs. While tracking runs, the status is updated every second (`--status N` for every N s; 0 turns it
+off), as in the MATLAB version: a line for each finished deformation (time taken, valid points per frame:
+median and minimum), and below them a block redrawn in place with the count and each running
+deformation's progress (frames, percent, elapsed time, time left, valid points, ZNCC, keyframes). When the
+output goes to a file, a count line with the running deformations is printed instead of the block. Each
+job's log is updated as often (at most every 10 s). `runDIC.log` keeps the finished deformations, not
+the block. Ctrl-C stops the run. It prints the total tracking time when tracking ends, and the total
 runtime of the run at the end of the summary, both on screen and in each test's `runDIC.log`.

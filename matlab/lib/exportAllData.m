@@ -1,5 +1,5 @@
 function exportAllData(testRoot, settings)
-% The loading branches of every tracked deformation (settings.track_deformations, Def01-Def19) in the
+% The loading branches of the tracked deformations among settings.export_deformations in the
 % layout of CellScale's AllData export: stress_stretch/stress-stretch test<N>.AllData.xlsx, one row per
 % image frame. As in CellScale's export, everything is relative to the first frame of each cycle (stretch
 % 1, forces tared there). The first 27 columns are CellScale's: the Data.csv columns, CellScale's 4 points
@@ -27,7 +27,7 @@ dN = 0.25 * [-1 -1; 1 -1; 1 1; -1 1];
 corners = @(r) [r(1) r(2); r(5) r(6); r(7) r(8); r(3) r(4)];   % points 1, 3, 4, 2: TL, TR, BR, BL
 
 out = {}; done = []; missing = []; dropped = {};
-for n = settings.track_deformations
+for n = settings.export_deformations
     fd = util.defFolder(testRoot, n);
     f = fullfile(testRoot, 'DIC_results', [fd '.mat']);
     if ~isfile(f), missing(end + 1) = n; continue; end %#ok<AGROW>
@@ -75,12 +75,12 @@ catch err
     util.log('  AllData: could not write %s (open in Excel?): %s', file, err.message); return
 end
 fid = fopen(fullfile(outDir, 'README.txt'), 'a');
-fprintf(fid, ['\n%s: the loading branches of Def%02d-Def%02d in the layout of CellScale''s AllData export, one row per ' ...
+fprintf(fid, ['\n%s: the loading branches of %s in the layout of CellScale''s AllData export, one row per ' ...
               'image frame, relative to the first frame of each cycle; lx ... tyx from the DIC (tine spans, H above), ' ...
               'the same with _4pt from CellScale''s 4 points (rake separations %.2f / %.2f mm, H above).\n'], ...
-        file(numel(outDir) + 2:end), min(done), max(done), wRake(1), wRake(2));
+        file(numel(outDir) + 2:end), util.defList(done), wRake(1), wRake(2));
 fclose(fid);
-msg = sprintf('  AllData: %d deformations (Def%02d-Def%02d), %d rows -> %s', numel(done), min(done), max(done), height(T), ...
+msg = sprintf('  AllData: %d deformations (%s), %d rows -> %s', numel(done), util.defList(done), height(T), ...
               file(numel(testRoot) + 2:end));
 if ~isempty(missing), msg = sprintf('%s; not tracked, left out: %s', msg, strjoin(compose('Def%02d', missing), ', ')); end
 if ~isfinite(H), msg = [msg '; NO THICKNESS: stresses NaN']; else, msg = sprintf('%s (H = %.3f mm, %s)', msg, H, Hsource); end

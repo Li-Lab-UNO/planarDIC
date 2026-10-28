@@ -6,7 +6,7 @@ Status of every test folder: what has been set up, tracked and exported, read fr
     .venv/bin/python strain_tracking/status.py --notes         also print each test's notes from test_config.json
 
 Columns: sorted (DefNN folders), config (test_config.json), scale (px/mm; excluded tine pairs),
-widths (w_theta / w_z tine spans, mm), H (thickness, mm, from the photos or the workbook), tracked (deformations with a full-domain
+widths (w_theta / w_z tine spans, mm), H (thickness, mm: measured from the photos, typed, or from the workbook), tracked (deformations with a full-domain
 track among Def11-Def19; "loading only" marks track_protocols.py --loading-only tracks), J/mean (peak_J_over_mean figure), exports (deformations with
 *_fields.npz).
 """
@@ -67,8 +67,9 @@ def row(td):
     w = cfg.get("widths_mm", {}).get("tine_span")
     th = cfg.get("thickness_mm", {})
     H = th.get("H")
-    Hsrc = "" if not H else " photos" if str(th.get("source", "")).startswith("measure_thickness") \
-        else " workbook" if ".xls" in str(th.get("source", "")) else " other"
+    src = str(th.get("source", ""))
+    Hsrc = ("" if not H else " photos" if src.startswith(("measure_thickness", "measured from"))
+            else " typed" if src == "typed" else " workbook" if ".xls" in src else " other")
     return dict(test=f"{T.sample.split('_')[0]}/{T.name.split('_')[0]}",
                 sorted=f"{len(folders)} folders" if folders else "no",
                 config="yes" if cfg else "no", scale=scale,

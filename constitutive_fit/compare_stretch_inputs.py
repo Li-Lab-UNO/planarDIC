@@ -19,7 +19,8 @@ tine_region, the default; outputs go to <test>/constitutive_fit/), or the test's
 region (--tracks standard, sliced from the full-domain tracks; outputs go to constitutive_fit/standard_roi/). --table-only writes the stretch table
 and stops before any fitting.
 Loading branch: from the logged Stretch start to the rake peak (loading_end), which is the logged
-Recover start in every protocol except Def12, where the motion continues 0.5 s past it.
+Recover start in every protocol except Def12, where the motion continues 0.5 s past it; a branch set by
+hand in the test's loading_branches.json (strain_tracking/review_branches.py) is used instead.
 Fit: multi-start least squares restricted to the physiological solution family with the
 elastin term active (C1_el > EL_MIN). The model also has a near-equal minimum with
 elastin switched off (C1_el ~ 0, gamma ~ 34 deg), which is excluded as non-physiological.
@@ -93,6 +94,7 @@ def build_table(sets, tracks="tine_region"):
         rc = ph[(ph.Set == s) & (ph.Phase == "Recover")].iloc[0]
         t0 = round(float(st["StartTime(s)"]), 1)
         t1 = loading_end(Dd, t0, round(float(rc["StartTime(s)"]), 1))
+        t0, t1 = D.branch_by_hand(TEST_ROOT, fd) or (t0, t1)                # set by hand (review_branches.py)
         R, _ = D.load_track(testcfg.get().results, fd, tracks)      # standard: sliced from the full domain if not tracked
         X0, shape, times = R["X0"], tuple(R["shape"]), np.round(R["times"], 1)
         pos, valid = R["pos"], R["valid"]
@@ -110,7 +112,7 @@ def build_table(sets, tracks="tine_region"):
         fz0, ft0 = Dd.X_Force_mN[times[k_load[0]]], Dd.Y_Force_mN[times[k_load[0]]]
         for k in k_load:
             t = times[k]
-            r = dict(set=s, folder=fd, name=st.SetName.replace(" save cycle", "").replace(" save cyle", ""), t=t,
+            r = dict(set=s, folder=fd, name=re.sub(r"\s+save\s+cyc?le$", "", st.SetName, flags=re.I), t=t,
                      fz=Dd.X_Force_mN[t] - fz0, ft=Dd.Y_Force_mN[t] - ft0)
             # cs4
             r["cs4_z"], r["cs4_t"] = lam_from_F(D.bilinear_F_center(ref["P"], P_all.loc[t].to_numpy(float).reshape(4, 2)))
@@ -180,7 +182,7 @@ def plot_curves(df, inp, w_t, w_z, H):
         if win >= 5:
             lz, lt, tzz, ttt = (savgol_filter(median_filter(v, PLOT_MEDIAN, mode="nearest"), win, 2)
                                 for v in (lz, lt, tzz, ttt))
-        name = d.name.iloc[0].replace(" ratio", "").replace(" Save Cycle", " (save)")
+        name = d.name.iloc[0].replace(" ratio", "")
         out.append((s, f"{d.folder.iloc[0].split('_')[0]} {name}", lz, lt, tzz, ttt))
     return out
 

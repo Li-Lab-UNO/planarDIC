@@ -1,6 +1,6 @@
 function T = exportStressStretch(testRoot, settings)
 % Stress-stretch data of the loading branches (Stretch start to the rake peak, or as set by hand in
-% loading_branches.json) of the analyzed deformations (settings.deformations, Def11-Def19), relative to
+% loading_branches.json) of the deformations settings.export_deformations (Def11-Def19 by default), relative to
 % the common reference (first frame of the reference deformation):
 %   lambda_z, lambda_theta   stretches from the DIC field: the homogeneous deformation gradient F fitted by
 %                            least squares to every valid tracked point (lambda = sqrt of the diagonal of F'F)
@@ -9,8 +9,9 @@ function T = exportStressStretch(testRoot, settings)
 %   stress_*_kPa             Cauchy stress, tension / thickness H (NaN when no thickness is set)
 %   lambda_*_cellscale       CellScale's own 4-point tracking (Coords1.csv), for comparison
 %   lambda_*_rake            rake separation (X/Y_Size_um), for comparison
-% Widths w_theta, w_z are the tine spans (measureTineSpans). Writes stress_stretch/<protocol>.csv,
-% stress_stretch/all_protocols.csv, stress_stretch/README.txt and stress_stretch/stress_stretch.png.
+% Widths w_theta, w_z are the tine spans (measureTineSpans). Writes, as settings.export_formats asks,
+% stress_stretch/<protocol>.csv ('csv'), stress_stretch/all_protocols.csv ('all_csv') and the plot
+% stress_stretch/stress_stretch.png, .pdf, .fig ('png', 'pdf', 'fig'); and always stress_stretch/README.txt.
 
 cfg = util.readJSON(fullfile(testRoot, 'test_config.json'));
 w = cfg.widths_mm.tine_span;                   % [w_theta w_z] mm
@@ -24,7 +25,9 @@ if ~isfolder(outDir), mkdir(outDir); end
 T = table();
 tRef = [];
 handSet = {};
-for n = settings.deformations
+defs = settings.export_deformations; formats = settings.export_formats;
+if isempty(defs), util.log('Stress-stretch: no deformation to export'); return; end
+for n = defs
     fd = util.defFolder(testRoot, n);
     f = fullfile(testRoot, 'DIC_results', [fd '.mat']);
     if ~isfile(f), error('runDIC:missing', '%s is not tracked (no DIC_results/%s.mat): run the track step', fd, fd); end
@@ -68,18 +71,19 @@ for n = settings.deformations
                'lambda_z', 'lambda_theta', 'tension_z_N_per_m', 'tension_theta_N_per_m', 'stress_zz_kPa', ...
                'stress_thetatheta_kPa', 'lambda_z_cellscale', 'lambda_theta_cellscale', 'lambda_z_rake', ...
                'lambda_theta_rake', 'valid_points_pct'});
-    writetable(Ti, fullfile(outDir, [fd '.csv']));
+    if any(strcmp(formats, 'csv')), writetable(Ti, fullfile(outDir, [fd '.csv'])); end
     T = [T; Ti]; %#ok<AGROW>
 end
-writetable(T, fullfile(outDir, 'all_protocols.csv'));
+if any(strcmp(formats, 'all_csv')), writetable(T, fullfile(outDir, 'all_protocols.csv')); end
 writeReadme(fullfile(outDir, 'README.txt'), cfg, w, H, Hsource, trk, handSet, settings);
-plotStressStretch(T, H, cfg, fullfile(outDir, 'stress_stretch.png'));
+plots = intersect({'png', 'pdf', 'fig'}, formats, 'stable');
+if ~isempty(plots), plotStressStretch(T, H, cfg, fullfile(outDir, 'stress_stretch'), plots); end
 if isfinite(H)
     util.log('Stress-stretch: %d protocols, %d rows (H = %.3f mm from %s, widths %.2f / %.2f mm) -> stress_stretch/', ...
-             numel(settings.deformations), height(T), H, Hsource, w(1), w(2));
+             numel(defs), height(T), H, Hsource, w(1), w(2));
 else
     util.log(['Stress-stretch: %d protocols, %d rows -> stress_stretch/ (NO THICKNESS: the stress columns are NaN; ' ...
-              'run the thickness step, see README.md)'], numel(settings.deformations), height(T));
+              'run the thickness step, see README.md)'], numel(defs), height(T));
 end
 end
 
@@ -109,6 +113,7 @@ function writeReadme(path, cfg, w, H, Hsource, trk, handSet, settings)
 fid = fopen(path, 'w');
 fprintf(fid, 'Stress-stretch data, %s\n\n', cfg.sample);
 fprintf(fid, 'One row per image frame of the loading branch of each protocol (Stretch start to the rake peak).\n');
+fprintf(fid, 'Protocols exported: %s.\n', util.defList(settings.export_deformations));
 TR = trackingStats(fileparts(fileparts(path)), settings, true);
 fprintf(fid, '%s.\n', TR(1).verdict);
 if ~isempty(handSet)
@@ -134,8 +139,9 @@ fclose(fid);
 end
 
 
-function plotStressStretch(T, H, cfg, path)
-% Every protocol on one plot: circles axial, triangles circumferential, one color per protocol.
+function plotStressStretch(T, H, cfg, base, formats)
+% Every protocol on one plot: circles axial, triangles circumferential, one color per protocol; saved as
+% base.png, base.pdf and/or base.fig (formats).
 if isfinite(H), yz = T.stress_zz_kPa; yt = T.stress_thetatheta_kPa; yl = 'Cauchy stress (kPa)';
 else, yz = T.tension_z_N_per_m; yt = T.tension_theta_N_per_m; yl = 'membrane tension (N/m)'; end
 fig = figure('Visible', 'off', 'Color', 'w', 'Position', [100 100 900 700]);
@@ -150,6 +156,14 @@ for i = 1:numel(protos)
 end
 xlabel('stretch'); ylabel(yl); grid on; legend('Location', 'northwest', 'Interpreter', 'none');
 title({strrep(cfg.sample, '_', ' '), 'circles: axial (\lambda_z), triangles: circumferential (\lambda_\theta)'});
-print(fig, path, '-dpng', '-r100');
+for f = formats
+    switch f{1}
+        case 'png', print(fig, [base '.png'], '-dpng', '-r100');
+        case 'pdf', exportgraphics(fig, [base '.pdf'], 'ContentType', 'vector');
+        case 'fig'
+            set(fig, 'CreateFcn', 'set(gcbo, ''Visible'', ''on'')');   % drawn hidden; opens shown
+            savefig(fig, [base '.fig']);
+    end
+end
 close(fig);
 end

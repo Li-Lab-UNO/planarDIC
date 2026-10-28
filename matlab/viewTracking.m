@@ -48,13 +48,13 @@ fig = figure('Name', ['runDIC: tracking report, ' util.shortName(testRoot)], 'Nu
              'WindowState', 'maximized', 'MenuBar', 'none', 'ToolBar', 'none', 'CloseRequestFcn', @onClose);
 [msg, sub, mcol] = verdictText();
 uicontrol(fig, 'Style', 'text', 'Units', 'normalized', 'Position', [0.01 0.955 0.8 0.035], 'String', msg, ...
-          'FontSize', 13, 'FontWeight', 'bold', 'ForegroundColor', mcol, 'BackgroundColor', 'w', 'HorizontalAlignment', 'left');
+          'FontSize', 11, 'FontWeight', 'bold', 'ForegroundColor', mcol, 'BackgroundColor', 'w', 'HorizontalAlignment', 'left');
 uicontrol(fig, 'Style', 'text', 'Units', 'normalized', 'Position', [0.01 0.925 0.8 0.03], 'String', sub, ...
-          'FontSize', 11, 'ForegroundColor', [0.35 0.35 0.35], 'BackgroundColor', 'w', 'HorizontalAlignment', 'left');
+          'FontSize', 10, 'ForegroundColor', [0.35 0.35 0.35], 'BackgroundColor', 'w', 'HorizontalAlignment', 'left');
 chkGrid = uicontrol(fig, 'Style', 'checkbox', 'Units', 'normalized', 'Position', [0.84 0.95 0.07 0.03], 'String', 'Grid', ...
-                    'Value', 1, 'FontSize', 11, 'BackgroundColor', 'w', 'Callback', @(~, ~) drawAll(true));
+                    'Value', 1, 'BackgroundColor', 'w', 'Callback', @(~, ~) drawAll(true));
 chkPts = uicontrol(fig, 'Style', 'checkbox', 'Units', 'normalized', 'Position', [0.91 0.95 0.08 0.03], 'String', 'Points', ...
-                   'Value', 1, 'FontSize', 11, 'BackgroundColor', 'w', 'Callback', @(~, ~) drawAll(true));
+                   'Value', 1, 'BackgroundColor', 'w', 'Callback', @(~, ~) drawAll(true));
 
 tiles = cell(n, 1);
 nc = ceil(sqrt(n)); nr = ceil(n / nc);
@@ -62,10 +62,10 @@ for i = 1:n
     tiles{i} = makeTile(i, mod(i - 1, nc), floor((i - 1) / nc));
 end
 
-btnPlay = uicontrol(fig, 'Style', 'pushbutton', 'Units', 'normalized', 'Position', [0.01 0.025 0.06 0.04], ...
-                    'String', 'Play', 'FontSize', 12, 'Callback', @(~, ~) onPlay());
-popSpeed = uicontrol(fig, 'Style', 'popupmenu', 'Units', 'normalized', 'Position', [0.075 0.025 0.07 0.04], ...
-                     'String', compose('%dx', speeds), 'Value', 2, 'FontSize', 11);
+btnPlay = util.button(fig, 'Pause', [0 0], @(~, ~) onPlay());   % as in MATLAB's own dialogs; sized for its longer label
+set(btnPlay, 'String', 'Play');
+popSpeed = uicontrol(fig, 'Style', 'popupmenu', 'Position', [0 0 70 22], ...
+                     'String', compose('%dx', speeds), 'Value', 2);
 slider = uicontrol(fig, 'Style', 'slider', 'Units', 'normalized', 'Position', [0.16 0.035 0.6 0.03], ...
                    'Min', 0, 'Max', 1, 'Value', f, 'SliderStep', [0.01 0.03], 'Callback', @(~, ~) onSlider());
 addlistener(slider, 'ContinuousValueChange', @(~, ~) onSlider());
@@ -75,12 +75,22 @@ for i = find(sev > 1)
     plot(axMark, R(i).worst_fraction, 0.5, '^', 'MarkerSize', 8, 'MarkerFaceColor', COL.(R(i).status), ...
          'MarkerEdgeColor', 'none');
 end
-txtPct = uicontrol(fig, 'Style', 'text', 'Units', 'normalized', 'Position', [0.77 0.028 0.12 0.03], 'FontSize', 11, ...
+txtPct = uicontrol(fig, 'Style', 'text', 'Units', 'normalized', 'Position', [0.77 0.028 0.12 0.03], 'FontSize', 10, ...
                    'BackgroundColor', 'w', 'HorizontalAlignment', 'left');
-uicontrol(fig, 'Style', 'pushbutton', 'Units', 'normalized', 'Position', [0.9 0.025 0.09 0.04], ...
-          'String', 'Open large', 'FontSize', 12, 'Callback', @(~, ~) onLarge());
+btnLarge = util.button(fig, 'Open large', [0 0], @(~, ~) onLarge());
+set(fig, 'SizeChangedFcn', @(~, ~) placeBar());
+placeBar();
 drawAll(true);
 
+
+    function placeBar()
+        % The pixel-sized controls along the bottom at the window's current size: on opening (a maximized
+        % window gets its size only once shown) and whenever it is resized.
+        fp = getpixelposition(fig); yb = round(0.033 * fp(4));
+        pb = get(btnPlay, 'Position'); set(btnPlay, 'Position', [round(0.01 * fp(3)) yb pb(3:4)]);
+        set(popSpeed, 'Position', [round(0.075 * fp(3)) yb 70 22]);
+        pl = get(btnLarge, 'Position'); set(btnLarge, 'Position', [round(0.99 * fp(3)) - pl(3) yb pl(3:4)]);
+    end
 
     function T = makeTile(i, col, row)
         % One deformation: axes, image (the tine region, subsampled), grid lines, points, readout.

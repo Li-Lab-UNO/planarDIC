@@ -32,11 +32,12 @@ g = imageOps.gaussBlur(gray8, 1.0);
 % ---- detect rods and tips (or, with settings.tine_tips = 'click', ask for all of them)
 rakes = struct(); problems = {};
 detectRakes = 1:4;
+clicked = false(1, 4);                           % rakes whose tips were clicked: kept as clicked
 if strcmpi(settings.tine_tips, 'click')
     for r = 1:4
         rakes.(rakeNames{r}) = clickRake(gray8, rakeNames{r}, rakeHor(r), rakeOut(r));
     end
-    detectRakes = [];
+    detectRakes = []; clicked(:) = true;
 end
 for r = detectRakes
     hor = rakeHor(r); out = rakeOut(r);
@@ -116,7 +117,10 @@ if ~isempty(problems)
             rakes.(rakeNames{r}) = old.(rakeNames{r});
             util.log('  %s rake: using the tines already in test_config.json', rakeNames{r});
         elseif usejava('desktop')                   % ask for the tips
-            rakes.(rakeNames{r}) = clickRake(gray8, rakeNames{r}, rakeHor(r), rakeOut(r));
+            near = [];
+            if isfield(rakes, rakeNames{r}), near = rakes.(rakeNames{r}).tips; end
+            rakes.(rakeNames{r}) = clickRake(gray8, rakeNames{r}, rakeHor(r), rakeOut(r), near);
+            clicked(r) = true;
             util.log('  %s rake: using the tips clicked', rakeNames{r});
         else
             overlay(gray8, rakes, [], fullfile(testRoot, 'DIC_results', 'config_tine_tips.png'));
@@ -128,25 +132,19 @@ end
 
 % ---- refine every tip with the calibration's tip finder (tip coordinate only)
 g08 = imageOps.gaussBlur(gray8, 0.8);
-[rakes, keptBy] = refineRakes(g08, rakes, rakeNames, C, struct());
+[rakes, keptBy] = refineRakes(g08, rakes, rakeNames(~clicked), C, struct());
+for r = find(clicked), keptBy.(rakeNames{r}) = C.N_RODS; end   % clicked tips are kept as clicked
 tipsPx = tipLines(rakes);
 
 % ---- ask whether the tips are right, and let the wrong rakes be clicked (desktop only)
 if settings.review_tines && usejava('desktop')
     while true
-        fig = overlay(gray8, rakes, tipsPx, '');
-        answer = questdlg({'Is every red circle on the tip of a tine?', ...
-            '(The yellow rectangle joins the tips of each rake.)'}, 'runDIC: tine tips', ...
-            'Yes, continue', 'No, fix some rakes', 'Yes, continue');
-        close(fig);
-        if ~strcmp(answer, 'No, fix some rakes'), break; end
-        [sel, ok] = listdlg('ListString', upper(rakeNames), 'SelectionMode', 'multiple', 'Name', 'runDIC', ...
-            'PromptString', 'Rakes to click again:', 'ListSize', [220 90], 'OKString', 'Click them');
-        if ~ok || isempty(sel), continue; end
-        for r = sel
-            rakes.(rakeNames{r}) = clickRake(gray8, rakeNames{r}, rakeHor(r), rakeOut(r));
-        end
-        [rakes, keptBy] = refineRakes(g08, rakes, rakeNames(sel), C, keptBy);
+        answer = askTips(gray8, rakes, tipsPx, rakeNames);
+        if strcmp(answer, 'Cancel the run'), util.cancel('the tine tips'); end
+        r = find(strcmp(answer, clickLabels(rakeNames)));
+        if isempty(r), break; end                  % Yes, continue
+        rakes.(rakeNames{r}) = clickRake(gray8, rakeNames{r}, rakeHor(r), rakeOut(r), rakes.(rakeNames{r}).tips);
+        keptBy.(rakeNames{r}) = C.N_RODS;              % kept as clicked
         tipsPx = tipLines(rakes);
     end
 end
@@ -298,7 +296,8 @@ function [rakes, keptBy] = refineRakes(g08, rakes, names, C, keptBy)
 % Refine the tips of rakes `names` with the calibration's tip finder (4 passes; tip coordinate only, the
 % centerline it finds sits on a rod edge). A refinement is kept when its last two passes agree within
 % SETTLE_PX, the rod-to-tissue contrast exceeds 30 gray levels and it moves the tip by at most 25 px
-% (centerline at most 10 px); otherwise the tip stays as found. keptBy.(rake) = tips kept unrefined.
+% (centerline at most 10 px); otherwise the tip stays as found. Clicked tips are not refined.
+% keptBy.(rake) = tips kept unrefined.
 for r = 1:numel(names)
     R = rakes.(names{r});
     kept = 0;
@@ -329,33 +328,129 @@ tipsPx = struct('z', [medTip('left'), medTip('right')], 'theta', [medTip('top'),
 end
 
 
-function R = clickRake(gray8, name, hor, out)
-% Ask for the 5 tine tips of one rake on the rest frame; they are refined automatically afterwards.
+function R = clickRake(gray8, name, hor, out, near)
+% Ask for the 5 tine tips of one rake on the rest frame; they are kept as clicked. The view starts on the
+% rake: around its tips `near` ([centerline tip] rows, 0-based) when given, else the half of the frame it
+% comes from. The scroll wheel zooms where the pointer is; right-click or Backspace removes the last click;
+% Done (or Enter) takes the 5 clicks. Closing the window cancels the run.
 if ~usejava('desktop')
     error('runDIC:tines', 'Clicking the tine tips needs the MATLAB desktop (this MATLAB runs without one).');
 end
+if nargin < 5, near = []; end
+[H, W] = size(gray8);
 fig = figure('Name', sprintf('Click the 5 tine tips of the %s rake', upper(name)), 'NumberTitle', 'off', ...
-             'Color', 'w', 'WindowState', 'maximized');
-imagesc(gray8, [0 255]); colormap(gray); axis image; hold on
+             'Color', 'w', 'WindowState', 'maximized', 'MenuBar', 'none', 'ToolBar', 'none', 'Pointer', 'crosshair', ...
+             'WindowScrollWheelFcn', @onScroll, 'KeyPressFcn', @onKey, 'CloseRequestFcn', @(~, ~) finish(false));
+ax = axes(fig, 'Units', 'normalized', 'Position', [0.02 0.09 0.96 0.83]);
+hImg = imagesc(ax, gray8, [0 255]); colormap(ax, gray); axis(ax, 'image', 'off'); hold(ax, 'on');
+disableDefaultInteractivity(ax); ax.Toolbar.Visible = 'off';
+set(hImg, 'ButtonDownFcn', @onClick);
+hMarks = plot(ax, NaN, NaN, 'r+', 'MarkerSize', 16, 'LineWidth', 1.5, 'PickableParts', 'none');
 head = sprintf('Click the tip of each of the 5 tines of the %s rake (the end of the rod, where it meets the tissue)', upper(name));
-x = []; y = []; marks = gobjects(0);
-while numel(x) < 5
-    title({head, sprintf('%d of 5 clicked. Zoom with the toolbar if needed; right-click or Backspace removes the last one', ...
-           numel(x))}, 'FontSize', 13);
-    [xi, yi, button] = ginput(1);
-    if isempty(button), continue; end                       % Enter without a click
-    if button == 3 || button == 8 || button == 127           % right-click, Backspace or Delete: undo the last tip
-        if ~isempty(x), x(end) = []; y(end) = []; delete(marks(end)); marks(end) = []; end
-    elseif button == 1
-        x(end + 1) = xi; y(end + 1) = yi; %#ok<AGROW>
-        marks(end + 1) = plot(xi, yi, 'ro', 'MarkerSize', 10, 'LineWidth', 1.5); %#ok<AGROW>
-    end
-    drawnow
-end
-title({head, '5 of 5 clicked'}, 'FontSize', 13); drawnow; pause(0.6); close(fig);
+hs = util.buttonRow(fig, {'Whole image', 'Back to the rake', 'Remove last click', 'Done'}, ...
+                    {@(~, ~) set(ax, 'XLim', [0.5 W + 0.5], 'YLim', [0.5 H + 0.5]), @(~, ~) rakeView(), ...
+                     @(~, ~) undo(), @(~, ~) finish(true)}, 0, 14);   % buttons as in MATLAB's own dialogs
+btnDone = hs(4); set(btnDone, 'Enable', 'off');
+set(fig, 'SizeChangedFcn', @(f, ~) placeRow(f, ax, hs, 0.07));
+placeRow(fig, ax, hs, 0.07);
+x = zeros(0, 1); y = x; ok = false;
+rakeView(); update();
+uiwait(fig);
+if isvalid(fig), delete(fig); end
+if ~ok, util.cancel(sprintf('clicking the %s rake', name)); end
 if hor, c = y - 1; t = x - 1; else, c = x - 1; t = y - 1; end     % 0-based (centerline, tip)
 [c, o] = sort(c); t = t(o);
 R = struct('horizontal', hor, 'out', out, 'tips', round([c(:), t(:)]));
+
+    function rakeView()
+        if ~isempty(near)
+            if hor, px = near(:, 2) + 1; py = near(:, 1) + 1; else, px = near(:, 1) + 1; py = near(:, 2) + 1; end
+            pad = max(60, 0.5 * max(max(px) - min(px), max(py) - min(py)));
+            xs = [min(px) - pad, max(px) + pad]; ys = [min(py) - pad, max(py) + pad];
+        else                                         % the half of the frame the rake comes from
+            xs = [0.5 W + 0.5]; ys = [0.5 H + 0.5];
+            if hor, xs = util.ternary(out < 0, [0.5 W / 2], [W / 2 W + 0.5]);
+            else, ys = util.ternary(out < 0, [0.5 H / 2], [H / 2 H + 0.5]); end
+        end
+        set(ax, 'XLim', [max(xs(1), 0.5) min(xs(2), W + 0.5)], 'YLim', [max(ys(1), 0.5) min(ys(2), H + 0.5)]);
+    end
+
+    function onClick(~, evt)
+        p = evt.IntersectionPoint;
+        if evt.Button == 3, undo(); return; end
+        if evt.Button ~= 1 || numel(x) >= 5, return; end
+        x(end + 1, 1) = p(1); y(end + 1, 1) = p(2);
+        update();
+    end
+
+    function undo()
+        if isempty(x), return; end
+        x(end) = []; y(end) = [];
+        update();
+    end
+
+    function update()
+        set(hMarks, 'XData', x, 'YData', y);
+        set(btnDone, 'Enable', util.ternary(numel(x) == 5, 'on', 'off'));
+        if numel(x) == 5, step = '5 of 5 clicked: Done (or Enter) takes them'; else, step = sprintf('%d of 5 clicked', numel(x)); end
+        title(ax, {head, sprintf('%s. Scroll to zoom; right-click or Backspace removes the last click', step)}, 'FontSize', 11);
+    end
+
+    function onKey(~, evt)
+        switch evt.Key
+            case {'backspace', 'delete'}, undo();
+            case {'return', 'enter'}, if numel(x) == 5, finish(true); end
+        end
+    end
+
+    function onScroll(~, evt)
+        p = ax.CurrentPoint(1, 1:2); xl = xlim(ax); yl = ylim(ax);
+        if p(1) < xl(1) || p(1) > xl(2) || p(2) < yl(1) || p(2) > yl(2), return; end
+        f = 1.25 ^ evt.VerticalScrollCount;
+        wNew = min(W, diff(xl) * f); hNew = min(H, diff(yl) * f);
+        if wNew < 40, return; end
+        nx = p(1) - (p(1) - xl(1)) / diff(xl) * wNew; ny = p(2) - (p(2) - yl(1)) / diff(yl) * hNew;
+        nx = min(max(nx, 0.5), W + 0.5 - wNew); ny = min(max(ny, 0.5), H + 0.5 - hNew);
+        set(ax, 'XLim', [nx nx + wNew], 'YLim', [ny ny + hNew]);
+    end
+
+    function finish(taken)
+        ok = taken;
+        uiresume(fig);
+    end
+end
+
+
+function answer = askTips(gray8, rakes, tipsPx, rakeNames)
+% The tips over the rest frame, in one window with the question and its answers: 'Yes, continue',
+% 'Click <RAKE> again' (that rake is then clicked) or 'Cancel the run' (also when the window is closed).
+fig = overlay(gray8, rakes, tipsPx, '');
+set(fig, 'UserData', 'Cancel the run', 'CloseRequestFcn', @(f, ~) util.answer(f, 'Cancel the run'));
+ax = get(fig, 'CurrentAxes');
+title(ax, {'Is every red circle on the tip of a tine? (The yellow rectangle joins the tips of each rake.)', ...
+      'If a rake''s circles are off, click that rake again with its button below.'}, 'FontSize', 11);
+labels = [clickLabels(rakeNames), {'Yes, continue', 'Cancel the run'}];
+hs = util.buttonRow(fig, labels, cellfun(@(a) @(~, ~) util.answer(fig, a), labels, 'UniformOutput', false), 0, 14);
+for k = 1:numel(rakeNames), set(hs(k), 'Position', get(hs(k), 'Position') - [48 0 0 0]); end   % a gap between the rakes and the answers
+set(fig, 'SizeChangedFcn', @(f, ~) placeRow(f, ax, hs, 0.08));
+placeRow(fig, ax, hs, 0.08);
+uiwait(fig);
+answer = 'Cancel the run';
+if isvalid(fig), answer = get(fig, 'UserData'); delete(fig); end
+end
+
+
+function placeRow(fig, ax, hs, top)
+% The image above a row of buttons (pixels) centered under it, at the window's current size: on opening
+% (a maximized window gets its size only once shown) and whenever it is resized.
+fp = getpixelposition(fig);
+set(ax, 'Position', [0.02 50 / fp(4) 0.96 1 - 50 / fp(4) - top]);
+util.centerRow(hs, fp(3) / 2);
+end
+
+
+function labels = clickLabels(rakeNames)
+labels = strcat('Click', {' '}, upper(rakeNames), ' again');
 end
 
 
@@ -383,7 +478,7 @@ if ~isempty(tipsPx)
     plot([x(1) x(2) x(2) x(1) x(1)], [y(1) y(1) y(2) y(2) y(1)], 'y-', 'LineWidth', 1.5);
     pad = 150; xlim([x(1) - pad, x(2) + pad]); ylim([y(1) - pad, y(2) + pad]);
 end
-title('Tine tips (red circles) and tine-tip lines (yellow): every circle should sit on a tine tip', 'FontSize', 13);
+title('Tine tips (red circles) and tine-tip lines (yellow): every circle should sit on a tine tip', 'FontSize', 11);
 if show
     drawnow
 else
