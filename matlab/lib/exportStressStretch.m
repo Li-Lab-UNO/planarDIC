@@ -29,14 +29,14 @@ T = table();
 tRef = [];
 handSet = {};
 defs = settings.export_deformations; formats = settings.export_formats;
-pre = [];                                      % preconditioning cycles for their own plot
+pre = zeros(1, 0);                             % preconditioning cycles for their own plot
 if any(strcmp(formats, 'precond'))
     d = dir(fullfile(testRoot, 'DIC_results', 'Def*.mat'));
     pre = intersect(1:10, cellfun(@(x) sscanf(x, 'Def%d'), {d.name}));
     if isempty(pre), util.log('  preconditioning plot: Def01-Def10 are not tracked'); end
 end
 if isempty(defs) && isempty(pre), util.log('  stress-stretch: no deformation to export'); return; end
-for n = union(defs, pre)
+for n = reshape(union(defs, pre), 1, [])      % a row: union gives a column when one of them is []
     fd = util.defFolder(testRoot, n);
     f = fullfile(testRoot, 'DIC_results', [fd '.mat']);
     if ~isfile(f), error('runDIC:missing', '%s is not tracked (no DIC_results/%s.mat): run the track step', fd, fd); end
