@@ -239,8 +239,8 @@ at once, about 0.5–2 min each). To fit one test on its own, run step 9's comma
 
 ## Thickness from photos: `thickness/measure_interactive.py`
 
-The wall thickness is measured from the photos of the test's strips (`<SAMPLE>/Thickness, <ID>/test <N>/`,
-the strips lying on their cut face on the blue mat or the steel ruler), in a window, with the same steps
+The wall thickness is measured from the photos of the test's strips (`<SAMPLE>/Thickness, <ID>/test <N>/`;
+the folder names are matched ignoring capitals, with or without the space; the strips lying on their cut face on the blue mat or the steel ruler), in a window, with the same steps
 as the MATLAB version (its edge finding, `thickness/strip_edges.py`, gives the same positions and
 thicknesses as MATLAB's to 1e-6 mm). Each photo is opened in turn; the scroll wheel zooms where the
 pointer is, and the cursor is a crosshair over the photo.
@@ -299,7 +299,7 @@ bar, and rerun that image with `--px-per-mm` if it is wrong.
 
 `--write` puts the result into each test's `test_config.json` as `thickness_mm`: H and H_sd are the mean
 and SD of all stations of the selected strips of the test's photos with a reliable scale (the folder
-`test <N>` or `test<N>` is matched to the test folder `test<N>_…`). One such photo is enough; the log
+`test <N>`, in any capitals and with or without the space, is matched to the test folder `test<N>_…`). One such photo is enough; the log
 lists the photos used and those left out with the reason (excluded, failed, no complete strip, scale
 uncertain), or says that the test got no thickness (the config then keeps what it has, such as the
 workbook value). A workbook value it replaces is kept in `thickness_mm.workbook`, and the log shows the

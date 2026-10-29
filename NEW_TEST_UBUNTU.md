@@ -98,12 +98,14 @@ This prints every command without running anything.
   click **Proceed**. A folder with no images, or more missing, needs a look: **No, stop this test**
   skips its later steps. The table is saved as `Images/sort_summary.csv`.
 - **config** finds the 20 tine tips in the first Def11 image, refines them, and writes `test_config.json`
-  with the tip lines, the label and a glint check. With an existing config it updates only the tine
-  settings and keeps everything else. A window shows the tips: if a red circle is off its tine tip,
-  answer **No, fix some rakes**, tick the rakes and click their 5 tips (the end of each rod, where it
-  meets the tissue; scroll to zoom, right-click or Backspace removes the last click). The clicks are
-  refined automatically. A rake the tip finder can't find (`SELF-CHECK FAILED` in the log) is asked for
-  the same way.
+  with the tip lines, the label and a glint check. A window shows the tips: if a rake's red circles are
+  off its tine tips, press its button (**Click LEFT again**, …) and click its 5 tips (the end of each
+  rod, where it meets the tissue; scroll to zoom, right-click or Backspace removes the last click); the
+  clicks are kept as clicked. A rake the tip finder can't find (`SELF-CHECK FAILED` in the log) is
+  asked for the same way. With an existing config, only the tine settings are updated and the tips
+  saved there (found or clicked) are kept: the window shows them first, with **Keep** (also when the
+  window is closed), a rake's button to click it again, and **Find again** to search the image as for a
+  new test. To search again without the window: `make_config.py --test SAMPLE/testN --update --find`.
 
 - **branches** shows the rake forces of Def11–Def19 with each loading branch shaded: from the start of
   stretching to the force peak. Each band should start where the forces begin to rise and end at their

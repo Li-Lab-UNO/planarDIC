@@ -33,6 +33,10 @@ With --review (runDIC.sh: review = yes), the tips are shown and the question is 
 is on the tip of a tine; the rakes answered wrong are clicked (5 tips each) and refined the same way. A
 rake that fails the self-check, with no tines in the config to start from, is clicked too.
 
+With --update, the tips saved in the config (calibration_tines_px, found or clicked) are kept instead of
+searched again: with --review they are shown first, to keep (also when the window is closed), to click a
+rake again, or to find them all again; --find searches again without asking.
+
     .venv/bin/python strain_tracking/make_config.py --test N1757/test1 --label "labeled healthy"
     .venv/bin/python strain_tracking/make_config.py --test N1739/test1 --out /tmp/check.json       (compare, no overwrite)
 Output: <test>/test_config.json (or --out) and <test>/DIC_results/config_tine_tips.png
@@ -257,9 +261,9 @@ def overlay(rgb, rakes, tips_px, path):
     cv2.imwrite(path, rgb[max(0, y0 - pad):y1 + pad, max(0, x0 - pad):x1 + pad])
 
 
-def show_tips(gray8, rakes, tips_px):
-    """The tips over the rest frame, with the question and its answers in the same window: "Continue" or
-    "Click <RAKE> again" (closing the window answers "Continue")."""
+def show_tips(gray8, rakes, tips_px, answers=("Continue",), note="If a rake's circles are off, click that rake again."):
+    """The tips over the rest frame, with the question and its answers in the same window: `answers` (closing the
+    window answers the first) or "Click <RAKE> again"."""
     fig = review.figure("runDIC: tine tips")
     ax = fig.add_axes([0.02, 0.15, 0.96, 0.78])
     ax.imshow(gray8, cmap="gray", vmin=0, vmax=255)
@@ -276,8 +280,7 @@ def show_tips(gray8, rakes, tips_px):
                  fontsize=11)
     fig.canvas.mpl_connect("scroll_event", lambda e: review.zoom(ax, e))
     return review.ask(fig, "Is every red circle on the tip of a tine? (The yellow rectangle joins the tips of "
-                      "each rake.) If a rake's circles are off, click that rake again.",
-                      ["Continue"] + [f"Click {s.upper()} again" for s in RAKES])
+                      "each rake.) " + note, list(answers) + [f"Click {s.upper()} again" for s in RAKES])
 
 
 def click_rake(gray8, side, near=None):
@@ -340,28 +343,40 @@ def refine(g, rakes):
     return out, kept
 
 
-def main():
-    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--label", default="", help='appended to the sample name, e.g. "labeled healthy"')
-    ap.add_argument("--reference", default="Def11", help="reference deformation (rest frame read here)")
-    ap.add_argument("--out", default=None, help="write here instead of the test's test_config.json")
-    ap.add_argument("--allow-warnings", action="store_true", help="write even if the self-check reports problems")
-    ap.add_argument("--update", action="store_true",
-                    help="update an existing test_config.json: replace the keys written here, keep the rest; a rake "
-                         "that fails the self-check starts from its existing tines instead")
-    ap.add_argument("--review", action="store_true", help="show the tips and ask whether they are right")
-    a = ap.parse_args()
-    if a.review:
-        review.enable()
-    T = testcfg.get()
-    out_path = a.out or T.config_file
-    if a.out is None and os.path.exists(T.config_file) and not a.update:
-        sys.exit(f"{T.config_file} exists: use --update to update it, or --out to write elsewhere")
+def tip_lines(rakes):
+    """tine_tips_px: the median tip of each rake (z: left, right; theta: top, bottom)."""
+    med = lambda side: int(round(float(np.median([t for _, t in rakes[side]["tips"]]))))  # noqa: E731
+    return {"z": [med("left"), med("right")], "theta": [med("top"), med("bottom")]}
 
-    folder = T.folder(a.reference)
-    _, paths = D.find_frames([os.path.join(T.images, folder)])
-    rgb = cv2.imread(paths[0])
-    gray8 = cv2.cvtColor(rgb, cv2.COLOR_BGR2GRAY)
+
+def saved_rakes(config):
+    """The tips of the 4 rakes saved in the config (calibration_tines_px), or None when any is missing."""
+    saved = config.get("calibration_tines_px") or {}
+    if all(len((saved.get(sd) or {}).get("tips", [])) == N_RODS for sd in RAKES):
+        return {sd: {k: saved[sd][k] for k in ("horizontal", "out", "tips")} for sd in RAKES}
+    return None
+
+
+def keep_or_click(gray8, rakes):
+    """Show the saved tips: "Keep" (also when the window is closed) returns them, "Click <RAKE> again" clicks
+    that rake (kept as clicked), "Find again" returns None."""
+    while True:
+        answer = show_tips(gray8, rakes, tip_lines(rakes), ["Keep", "Find again"],
+                           "These are the tips saved before. Keep them, click a rake again, or find all the tips again.")
+        if answer == "Keep":
+            return rakes
+        if answer == "Find again":
+            return None
+        sd = answer.split()[1].lower()                     # "Click LEFT again"
+        r = click_rake(gray8, sd, rakes[sd]["tips"])
+        if r:
+            rakes[sd] = r
+            print(f"  {sd} rake: tips clicked (kept as clicked)")
+
+
+def find_tips(a, T, gray8):
+    """Detect, self-check, refine and (with --review) show the tips of the rest frame; exits when the self-check
+    fails and nothing can stand in."""
     g = cv2.GaussianBlur(gray8.astype(np.float32), (0, 0), 1.0)
     rakes, problems = detect(g)
     failed = sorted({p.split()[0] for p in problems})
@@ -391,15 +406,47 @@ def main():
     moved = [abs(t - d[1]) for sd in rakes for (c, t), d in zip(rakes[sd]["tips"], detected[sd])]
     print(f"refined with calibrate_scale.find_tip: {20 - kept} of 20 tips (median move {np.median(moved):.0f} px, "
           f"max {max(moved):.0f} px); {kept} kept as detected or clicked")
-    med = lambda side: int(round(float(np.median([t for _, t in rakes[side]["tips"]]))))  # noqa: E731
-    tips_px = {"z": [med("left"), med("right")], "theta": [med("top"), med("bottom")]}
-    while review.enabled() and (answer := show_tips(gray8, rakes, tips_px)) != "Continue":
+    while review.enabled() and (answer := show_tips(gray8, rakes, tip_lines(rakes))) != "Continue":
         sd = answer.split()[1].lower()                     # "Click LEFT again"
         r = click_rake(gray8, sd, rakes[sd]["tips"])
         if r:
             rakes[sd] = r
             print(f"  {sd} rake: tips clicked (kept as clicked)")
-        tips_px = {"z": [med("left"), med("right")], "theta": [med("top"), med("bottom")]}
+    return rakes
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--label", default="", help='appended to the sample name, e.g. "labeled healthy"')
+    ap.add_argument("--reference", default="Def11", help="reference deformation (rest frame read here)")
+    ap.add_argument("--out", default=None, help="write here instead of the test's test_config.json")
+    ap.add_argument("--allow-warnings", action="store_true", help="write even if the self-check reports problems")
+    ap.add_argument("--update", action="store_true",
+                    help="update an existing test_config.json: replace the keys written here, keep the rest; a rake "
+                         "that fails the self-check starts from its existing tines instead")
+    ap.add_argument("--review", action="store_true", help="show the tips and ask whether they are right")
+    ap.add_argument("--find", action="store_true",
+                    help="with --update, search the tips again instead of keeping the ones saved in the config")
+    a = ap.parse_args()
+    if a.review:
+        review.enable()
+    T = testcfg.get()
+    out_path = a.out or T.config_file
+    if a.out is None and os.path.exists(T.config_file) and not a.update:
+        sys.exit(f"{T.config_file} exists: use --update to update it, or --out to write elsewhere")
+
+    folder = T.folder(a.reference)
+    _, paths = D.find_frames([os.path.join(T.images, folder)])
+    rgb = cv2.imread(paths[0])
+    gray8 = cv2.cvtColor(rgb, cv2.COLOR_BGR2GRAY)
+    rakes = saved_rakes(T.config) if (a.update and not a.find) else None
+    if rakes:
+        rakes = keep_or_click(gray8, rakes) if review.enabled() else rakes
+        if rakes:
+            print("tine tips: the ones saved in the config (--find searches again)")
+    if not rakes:
+        rakes = find_tips(a, T, gray8)
+    tips_px = tip_lines(rakes)
     (z0, z1), (t0, t1) = tips_px["z"], tips_px["theta"]
     sat = 100 * float(np.mean(gray8[t0:t1, z0:z1] >= SAT_LEVEL))
 

@@ -81,7 +81,7 @@ sys.path.insert(1, os.path.join(os.path.dirname(HERE), "strain_tracking"))
 import testcfg  # noqa: E402
 import constitutive as M  # noqa: E402
 import dic2d as D  # noqa: E402
-from stage1_uniform_fe import COMPONENTS, INPUT, explained, fill_edge, strain  # noqa: E402
+from stage1_uniform_fe import COMPONENTS, INPUT, explained, strain  # noqa: E402
 from stage1b_best_uniform import Problem  # noqa: E402
 
 TRAIN = ("Def11", "Def14", "Def18")

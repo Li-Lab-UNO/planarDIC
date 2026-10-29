@@ -47,8 +47,9 @@ Steps (in this order; --steps picks a subset, comma separated):
                                 test_config.json (sample, notes)
   sort     sort_images.py       sort the images into Def01-Def19 folders (safe to re-run) and check
                                 every folder for missing images, Data.csv rows and Coords1.csv rows
-  config   make_config.py       find and refine the tine tips (--update keeps every other setting;
-                                a test without test_config.json gets a new one, see --label)
+  config   make_config.py       find and refine the tine tips, or keep the ones saved before (--update
+                                keeps every other setting; a test without test_config.json gets a new
+                                one, see --label)
   branches review_branches.py   loading branch of each deformation (Stretch start to the rake peak) ->
                                 DIC_results/loading_branches.png; branches set by hand in the review
                                 window go to loading_branches.json (used by --loading-only and the fits)

@@ -7,11 +7,11 @@ digital image correlation (DIC), checks the tracking for local errors and writes
 frame of every loading curve: CSV files, and an Excel file in the layout of CellScale's own AllData
 export. A tracking report shows the tracking of every protocol at the end.
 
-It runs on Windows, macOS and Linux with **MATLAB R2021a or later and no toolboxes** (the Parallel
+It runs on Windows, macOS and Linux with **MATLAB R2025b or later and no toolboxes** (the Parallel
 Computing Toolbox, when installed, speeds up the tracking on computers with many cores; see "Settings").
 
-For a first run, print `QUICKSTART.pdf`: every window in order, with screenshots and what to answer
-(its source, with the screenshots, is in `quickstart\`).
+For a first run, print `QUICKSTART.pdf`: every window in order, with screenshots and what to answer.
+(Its source, `quickstart\` with the screenshots, is not needed to run anything.)
 
 ## Setting up (once)
 
@@ -218,16 +218,18 @@ when the test has no photos). After measuring, the window comes back with the re
 (yellow, with its spread and the thickness saved before beside it); **OK** saves it, and **Revert** puts
 that box back as it was. A typed value turns the box yellow too. A blank box, or a saved thickness left
 as it is, changes nothing; a test without a thickness has `NaN` stress columns. Without the `thickness`
-step, the window opens (when exporting) only for tests that have no thickness. The thickness is saved in the test's `test_config.json`, with where it came
-from (`typed`, or the photos, strips and positions measured).
+step, the window opens (when exporting) only for tests that have no thickness. The thickness is saved
+in the test's `test_config.json`, with where it came from (`typed`, or the photos, strips and positions
+measured).
 
 ### Measuring from the photos
 
 The photos of a test's strips, lying on their cut face on the blue cutting mat or the steel ruler, are
-in the sample folder's `Thickness, <ID>\test <N>` folder (for example `Thickness, 1900\test 1`). Any folder
-whose name starts with "Thickness" is searched, and the test folder is found whatever its capitals and with or
-without the space (`test 1`, `Test 1`, `test1`). Each
-photo is opened in turn; scroll to zoom where the pointer is.
+in the sample folder's `Thickness, <ID>\test <N>` folder (for example `Thickness, 1900\test 1`). Any
+folder whose name starts with "Thickness" is searched, and the test folder is found whatever its capitals
+and with or without the space (`test 1`, `Test 1`, `test1`). Only `.jpg` photos are used; when there are
+none, a window lists the folders searched and what is in them. Each photo is opened in turn; scroll to
+zoom where the pointer is.
 
 1. **Scale, 1 grid spacing.** Click on one grid line and then on the next one, straight across one grid
    spacing (or one ruler tick), and type the size of that spacing with its unit (a mat square is

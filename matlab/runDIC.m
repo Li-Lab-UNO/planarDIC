@@ -13,7 +13,7 @@ function runDIC(folder, varargin)
 %           measured from its photos, filled in with the saved one -> test_config.json
 %   sort    images into one folder per load-unload cycle (Images/Def01_... to Def19_...), then checks that
 %           every cycle has all its images, Data.csv rows and Coords1.csv rows -> Images/sort_summary.csv
-%   tines   finds the 20 tine tips in the first image of Def11 -> test_config.json
+%   tines   finds the 20 tine tips in the first image of Def11 (or keeps the ones saved before) -> test_config.json
 %           check DIC_results/config_tine_tips.png: every red circle should sit on a tine tip
 %   scale   image scale from the tine motion in Def01 and Def19 -> scale_calibration.json
 %           check DIC_results/scale_calibration.png
@@ -442,9 +442,8 @@ for k = 1:nf
     fbox(k) = uicontrol(grp, 'Style', 'checkbox', 'Position', [10 (nf - k) * 20 + 4 W - 70 18], 'BackgroundColor', 'w', ...
                         'String', fmt{k, 2}, 'Value', ismember(fmt{k, 1}, s.export_formats));
 end
-k = find(strcmp(fmt(:, 1), 'precond'));
 if ~any(avail <= 10)                                      % offered only when a preconditioning cycle is tracked
-    set(fbox(k), 'Value', 0, 'Enable', 'off', 'String', 'Preconditioning plot (Def01-Def10 not tracked)');
+    set(fbox(strcmp(fmt(:, 1), 'precond')), 'Value', 0, 'Enable', 'off', 'String', 'Preconditioning plot (Def01-Def10 not tracked)');
 end
 old = [dir(fullfile(testRoot, 'stress_stretch', '*.csv')); dir(fullfile(testRoot, 'stress_stretch', '*.xlsx'))];
 skipLabel = repmat({'Skip'}, 1, ~isempty(old));

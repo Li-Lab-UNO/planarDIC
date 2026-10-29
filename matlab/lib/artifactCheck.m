@@ -207,7 +207,7 @@ end
 function plotCheck(path, z, th, res, thr, found, sample, excl, tips, mpp)
 fig = figure('Visible', 'off', 'Color', 'w', 'Position', [100 100 760 760]);
 pcolor(z, th, res); shading flat; axis equal tight; hold on
-colormap(hot); clim([0 max(2 * thr, 100)]);
+colormap(hot); set(gca, 'CLim', [0 max(2 * thr, 100)]);   % not clim(): that needs R2022a
 cb = colorbar; cb.Label.String = '|displacement - neighborhood median| at the peak (\mum)';
 green = [0.18 0.8 0.44];
 for q = 1:size(excl, 1)                         % excluded regions (not tracked: blank in the map)
