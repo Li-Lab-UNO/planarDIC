@@ -23,7 +23,8 @@ function runDIC(folder, varargin)
 %   artifacts  finds local tracking errors (a speckle particle sliding over the tissue, a shifting glare
 %           patch), excludes them in test_config.json and tracks again -> DIC_results/artifact_check.png
 %   export  the deformations and files picked in the export window (Def11-Def19 by default): stress-stretch
-%           CSVs and plot -> stress_stretch/, and the loading branches in CellScale's AllData layout ->
+%           CSVs and plot -> stress_stretch/, and the loading branches in
+%           CellScale's AllData layout ->
 %           stress_stretch/stress-stretch test<N>.AllData.xlsx
 %   report  the tracking report (viewTracking) of the existing tracks; it also opens at the end of a run
 %           that tracked
@@ -487,26 +488,47 @@ end
 function askInfo(tests)
 % Ask for the label and notes of every test (filled in with the saved ones) and save them in each
 % test's test_config.json.
-prompts = cell(1, 2 * numel(tests)); defaults = prompts;
-for i = 1:numel(tests)
+n = numel(tests);
+W = 640; rowH = 160; Hfig = 70 + n * rowH;               % in pixels; buttons as in MATLAB's own dialogs
+fig = figure('Name', 'runDIC: sample label and notes', 'NumberTitle', 'off', 'Color', 'w', 'MenuBar', 'none', ...
+             'ToolBar', 'none', 'Position', [200 200 W Hfig], 'Resize', 'off', 'CloseRequestFcn', @(~, ~) cancelRun());
+movegui(fig, 'center');
+lab = gobjects(n, 1); nts = gobjects(n, 1); cancelled = false;
+for i = 1:n
     [sampleDir, name] = fileparts(tests{i});
     [~, sample] = fileparts(sampleDir);
     who = sprintf('%s, %s', strrep(sample, '_', ' '), regexp(name, '^test\d+', 'match', 'once'));
     [label, notes] = util.sampleInfo(tests{i});
-    prompts{2 * i - 1} = sprintf('%s: label (for example healthy, or slightly calcified)', who);
-    prompts{2 * i} = sprintf('%s: notes, one per line (tears, re-mounting, anything unusual)', who);
-    defaults{2 * i - 1} = label; defaults{2 * i} = char(notes);
+    y = Hfig - 20 - (i - 1) * rowH;                      % top of this test's rows
+    uicontrol(fig, 'Style', 'text', 'Position', [20 y - 18 W - 40 18], 'FontSize', 10, 'HorizontalAlignment', 'left', ...
+              'BackgroundColor', 'w', 'String', sprintf('%s: label (for example healthy, or slightly calcified)', who));
+    lab(i) = uicontrol(fig, 'Style', 'edit', 'Position', [20 y - 44 W - 40 24], 'HorizontalAlignment', 'left', ...
+                       'FontSize', 10, 'String', label);
+    uicontrol(fig, 'Style', 'text', 'Position', [20 y - 74 W - 40 18], 'FontSize', 10, 'HorizontalAlignment', 'left', ...
+              'BackgroundColor', 'w', 'String', sprintf('%s: notes, one per line (tears, re-mounting, anything unusual)', who));
+    nts(i) = uicontrol(fig, 'Style', 'edit', 'Max', 2, 'Position', [20 y - 150 W - 40 74], 'HorizontalAlignment', 'left', ...
+                       'FontSize', 10, 'String', notes);
 end
-answers = inputdlg(prompts, 'runDIC: sample label and notes', repmat([1 80; 4 80], numel(tests), 1), defaults, ...
-                   struct('Resize', 'on'));
-if isempty(answers), util.cancel('the label and notes window'); end
-for i = 1:numel(tests)
-    label = strtrim(answers{2 * i - 1});
-    notes = strtrim(cellstr(answers{2 * i}))';
+util.buttonRow(fig, {'OK', 'Cancel'}, {@(~, ~) uiresume(fig), @(~, ~) cancelRun()}, W - 20, 16);
+uicontrol(lab(1));                                        % typing goes into the first label
+uiwait(fig);
+if cancelled || ~isvalid(fig)
+    if isvalid(fig), delete(fig); end
+    util.cancel('the label and notes window');
+end
+for i = 1:n
+    label = strtrim(get(lab(i), 'String'));
+    notes = strtrim(cellstr(get(nts(i), 'String')))';
     notes = notes(~cellfun(@isempty, notes));
     util.setSampleInfo(tests{i}, label, notes);
     util.log('  %s: label "%s", %d note(s) -> test_config.json', util.shortName(tests{i}), label, numel(notes));
 end
+delete(fig);
+
+    function cancelRun()
+        cancelled = true;
+        uiresume(fig);
+    end
 end
 
 

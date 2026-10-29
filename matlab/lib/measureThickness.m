@@ -9,8 +9,11 @@ function res = measureThickness(testRoot, settings)
 % scale and crop) and an overlay per photo.
 
 res = [];
-[photoDir, photos] = util.thicknessPhotos(testRoot);
-if isempty(photos), errordlg(sprintf('No photos found for %s', testRoot), 'runDIC'); return; end
+[photoDir, photos, looked] = util.thicknessPhotos(testRoot);
+if isempty(photos)
+    util.log('  no thickness photos for %s:\n    %s', testRoot, strjoin(looked, '\n    '));
+    errordlg([{sprintf('No .jpg photos found for %s.', testRoot), '', 'Looked in:'}, looked], 'runDIC'); return
+end
 [~, tn] = fileparts(testRoot); testName = regexp(tn, '^test\d+', 'match', 'once');
 
 DISPLAY_PX = 2000;                               % displayed image size (px) for the whole photo

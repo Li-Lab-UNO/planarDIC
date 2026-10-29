@@ -125,21 +125,27 @@ classdef util
             folder = d(1).name;
         end
 
-        function [folder, photos] = thicknessPhotos(testRoot)
+        function [folder, photos, looked] = thicknessPhotos(testRoot)
             % The thickness photo folder of a test, <sample>/Thickness*/test <N>, and its .jpg photos; ''
             % and {} when there is none. Names are matched ignoring case, with or without the space ("Test 1",
-            % "test1"), since Linux file names are case-sensitive.
-            folder = ''; photos = {};
+            % "test1"), since Linux file names are case-sensitive. looked lists the folders searched and what
+            % was found in them, for the message when there are no photos.
+            folder = ''; photos = {}; looked = {};
             [sampleDir, name] = fileparts(testRoot);
             n = regexpi(name, '^test(\d+)', 'tokens', 'once');
-            if isempty(n), return; end
-            for d = util.subfolders(sampleDir, '^thickness')
-                for t = util.subfolders(fullfile(sampleDir, d{1}), '^test\s*(\d+)$')
-                    if str2double(regexpi(t{1}, '\d+', 'match', 'once')) ~= str2double(n{1}), continue; end
+            if isempty(n), looked = {sprintf('%s is not a test folder (test<N>_...)', name)}; return; end
+            th = util.subfolders(sampleDir, '^thickness');
+            if isempty(th), looked = {sprintf('no Thickness... folder in %s', sampleDir)}; end
+            for d = th
+                ts = util.subfolders(fullfile(sampleDir, d{1}), '^test\s*(\d+)$');
+                ts = ts(cellfun(@(t) str2double(regexpi(t, '\d+', 'match', 'once')) == str2double(n{1}), ts));
+                if isempty(ts), looked{end + 1} = sprintf('%s: no test %s folder', fullfile(sampleDir, d{1}), n{1}); end %#ok<AGROW>
+                for t = ts
                     f = fullfile(sampleDir, d{1}, t{1});
                     p = dir(f); p = {p(~[p.isdir]).name};
-                    p = p(~cellfun(@isempty, regexpi(p, '\.jpe?g$', 'once')));
-                    if ~isempty(p), folder = f; photos = sort(p); return; end
+                    jpg = p(~cellfun(@isempty, regexpi(p, '\.jpe?g$', 'once')));
+                    if ~isempty(jpg), folder = f; photos = sort(jpg); return; end
+                    looked{end + 1} = sprintf('%s: %d file(s), no .jpg', f, numel(p)); %#ok<AGROW>
                 end
             end
         end
