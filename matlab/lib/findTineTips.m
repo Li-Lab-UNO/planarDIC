@@ -13,6 +13,9 @@ function cfg = findTineTips(testRoot, label, settings)
 % every tip) runs on each rake; a rake that fails it takes its tines saved before, else its tips are
 % clicked (desktop), else the run stops. With settings.review_tines the tips are shown and any rake can
 % be clicked again; clicked tips are kept as clicked. Check DIC_results/config_tine_tips.png.
+% Tips saved before (calibration_tines_px of test_config.json) are kept: with settings.review_tines they are
+% shown first, to keep, to click a rake again or to find them all again; settings.tine_tips = 'find' finds
+% them again without asking.
 
 C.N_RODS = 5;
 C.BANDS = [0.10 0.27; 0.04 0.18; 0.08 0.20; 0.16 0.30];
@@ -30,6 +33,30 @@ folder = util.defFolder(testRoot, refDef);
 gray8 = imageOps.readGray(paths{1});
 g = imageOps.gaussBlur(gray8, 1.0);
 [H, W] = size(g);
+
+% ---- tips saved before: shown and kept, unless asked to find them again
+saved = savedRakes(fullfile(testRoot, 'test_config.json'), rakeNames);
+if ~isempty(saved) && strcmpi(settings.tine_tips, 'auto')
+    rakes = saved; changed = false; findAgain = false;
+    if settings.review_tines && usejava('desktop')
+        while true
+            answer = askTips(gray8, rakes, tipLines(rakes), rakeNames, {'Keep', 'Find again'}, ...
+                'These are the tips saved before. Keep them, click a rake again, or find all the tips again.');
+            if strcmp(answer, 'Cancel'), util.cancel('the tine tips'); end
+            if strcmp(answer, 'Find again'), findAgain = true; break; end
+            r = find(strcmp(answer, clickLabels(rakeNames)));
+            if isempty(r), break; end                  % Keep
+            rakes.(rakeNames{r}) = clickRake(gray8, rakeNames{r}, rakeHor(r), rakeOut(r), rakes.(rakeNames{r}).tips);
+            changed = true;
+        end
+    end
+    if ~findAgain
+        [cfg, tipsPx, sat] = writeTips(testRoot, label, refDef, gray8, rakes, C);
+        util.log('  tine tips: the ones saved before%s: z %d-%d px, theta %d-%d px; saturated %.2f%% of the tine region', ...
+                 util.ternary(changed, ', with the rakes clicked again', ''), tipsPx.z, tipsPx.theta, sat);
+        return
+    end
+end
 
 % ---- detect rods and tips (or, with settings.tine_tips = 'click', ask for all of them)
 rakes = struct(); problems = {};
@@ -142,7 +169,9 @@ tipsPx = tipLines(rakes);
 if settings.review_tines && usejava('desktop')
     saved = hasTips(testRoot);                         % tips saved before: Skip keeps them
     while true
-        answer = askTips(gray8, rakes, tipsPx, rakeNames, saved);
+        answer = askTips(gray8, rakes, tipsPx, rakeNames, [{'Continue'}, repmat({'Skip'}, 1, saved)], ...
+            ['If a rake''s circles are off, click that rake again with its button below.', ...
+             repmat(' Skip keeps the tips saved before.', 1, saved)]);
         if strcmp(answer, 'Cancel'), util.cancel('the tine tips'); end
         if strcmp(answer, 'Skip')
             util.log('  skipped, the tips saved before are kept');
@@ -156,29 +185,9 @@ if settings.review_tines && usejava('desktop')
         tipsPx = tipLines(rakes);
     end
 end
-z0 = tipsPx.z(1); z1 = tipsPx.z(2); y0 = tipsPx.theta(1); y1 = tipsPx.theta(2);
-region = gray8(y0 + 1:y1, z0 + 1:z1);
-sat = 100 * mean(region(:) >= C.SAT_LEVEL);
-
-% ---- write test_config.json (other settings already in it are kept)
-cfgFile = fullfile(testRoot, 'test_config.json');
-if isfile(cfgFile), cfg = util.readJSON(cfgFile); else, cfg = struct(); end
-if ~isempty(label) || ~isfield(cfg, 'sample'), cfg.sample = util.sampleName(testRoot, label); end
-cfg.roi_px = struct('standard', [z0 + 40, y0 + 40, z1 - 40, y1 - 40], 'tine_region', [z0 + 10, y0 + 10, z1 - 10, y1 - 10]);
-cfg.tine_tips_px = tipsPx;
-cfg.calibration_tines_px = rakes;
-if ~isfield(cfg, 'reference_deformation'), cfg.reference_deformation = sprintf('Def%02d', refDef); end
-if ~isfield(cfg, 'dic'), cfg.dic = struct(); end
-if ~isfield(cfg.dic, 'mask_saturated')
-    cfg.dic.mask_saturated = sat > 0 && sat < C.SAT_MAX;
-    if sat == 0, why = 'no saturated pixels'; elseif sat < C.SAT_MAX, why = 'glints masked';
-    else, why = 'overexposed: masking would remove too much of the speckle'; end
-    cfg.dic.note = sprintf('rest frame: %.3f%% of the tine region at gray >= %d (%s)', sat, C.SAT_LEVEL, why);
-end
-util.writeJSON(cfgFile, cfg);
-overlay(gray8, rakes, tipsPx, fullfile(testRoot, 'DIC_results', 'config_tine_tips.png'));
+[cfg, tipsPx, sat] = writeTips(testRoot, label, refDef, gray8, rakes, C);
 util.log('  tine tips: z %d-%d px, theta %d-%d px (%d of 20 refined); saturated %.2f%% of the tine region', ...
-         z0, z1, y0, y1, 20 - sum(cellfun(@(f) keptBy.(f), fieldnames(keptBy))), sat);
+         tipsPx.z, tipsPx.theta, 20 - sum(cellfun(@(f) keptBy.(f), fieldnames(keptBy))), sat);
 end
 
 
@@ -439,17 +448,16 @@ R = struct('horizontal', hor, 'out', out, 'tips', round([c(:), t(:)]));
 end
 
 
-function answer = askTips(gray8, rakes, tipsPx, rakeNames, saved)
-% The tips over the rest frame, in one window with the question and its answers: 'Continue',
-% 'Click <RAKE> again' (that rake is then clicked), 'Skip' (with tips saved before: keep them) or
-% 'Cancel' (also when the window is closed).
+function answer = askTips(gray8, rakes, tipsPx, rakeNames, answers, note)
+% The tips over the rest frame, in one window with the question, the line note and the answers:
+% 'Click <RAKE> again' (that rake is then clicked), answers (e.g. 'Continue', 'Skip') or 'Cancel' (also
+% when the window is closed).
 fig = overlay(gray8, rakes, tipsPx, '');
 set(fig, 'UserData', 'Cancel', 'CloseRequestFcn', @(f, ~) util.answer(f, 'Cancel'));
 ax = get(fig, 'CurrentAxes');
 title(ax, {'Is every red circle on the tip of a tine? (The yellow rectangle joins the tips of each rake.)', ...
-      ['If a rake''s circles are off, click that rake again with its button below.', ...
-       repmat(' Skip keeps the tips saved before.', 1, saved)]}, 'FontSize', 11);
-labels = [clickLabels(rakeNames), {'Continue'}, repmat({'Skip'}, 1, saved), {'Cancel'}];
+      note}, 'FontSize', 11);
+labels = [clickLabels(rakeNames), answers, {'Cancel'}];
 hs = util.buttonRow(fig, labels, cellfun(@(a) @(~, ~) util.answer(fig, a), labels, 'UniformOutput', false), 0, 14);
 for k = 1:numel(rakeNames), set(hs(k), 'Position', get(hs(k), 'Position') - [48 0 0 0]); end   % a gap between the rakes and the answers
 set(fig, 'SizeChangedFcn', @(f, ~) placeRow(f, ax, hs, 0.08));
@@ -511,5 +519,45 @@ if show
 else
     print(fig, path, '-dpng', '-r100');
     close(fig);
+end
+end
+
+
+function [cfg, tipsPx, sat] = writeTips(testRoot, label, refDef, gray8, rakes, C)
+% Write the rakes' tips, their tip lines, the tracking regions and the glint check into test_config.json
+% (other settings already in it are kept), and draw DIC_results/config_tine_tips.png.
+tipsPx = tipLines(rakes);
+z0 = tipsPx.z(1); z1 = tipsPx.z(2); y0 = tipsPx.theta(1); y1 = tipsPx.theta(2);
+region = gray8(y0 + 1:y1, z0 + 1:z1);
+sat = 100 * mean(region(:) >= C.SAT_LEVEL);
+
+cfgFile = fullfile(testRoot, 'test_config.json');
+if isfile(cfgFile), cfg = util.readJSON(cfgFile); else, cfg = struct(); end
+if ~isempty(label) || ~isfield(cfg, 'sample'), cfg.sample = util.sampleName(testRoot, label); end
+cfg.roi_px = struct('standard', [z0 + 40, y0 + 40, z1 - 40, y1 - 40], 'tine_region', [z0 + 10, y0 + 10, z1 - 10, y1 - 10]);
+cfg.tine_tips_px = tipsPx;
+cfg.calibration_tines_px = rakes;
+if ~isfield(cfg, 'reference_deformation'), cfg.reference_deformation = sprintf('Def%02d', refDef); end
+if ~isfield(cfg, 'dic'), cfg.dic = struct(); end
+if ~isfield(cfg.dic, 'mask_saturated')
+    cfg.dic.mask_saturated = sat > 0 && sat < C.SAT_MAX;
+    if sat == 0, why = 'no saturated pixels'; elseif sat < C.SAT_MAX, why = 'glints masked';
+    else, why = 'overexposed: masking would remove too much of the speckle'; end
+    cfg.dic.note = sprintf('rest frame: %.3f%% of the tine region at gray >= %d (%s)', sat, C.SAT_LEVEL, why);
+end
+util.writeJSON(cfgFile, cfg);
+overlay(gray8, rakes, tipsPx, fullfile(testRoot, 'DIC_results', 'config_tine_tips.png'));
+end
+
+
+function rakes = savedRakes(cfgFile, rakeNames)
+% The tips of the 4 rakes saved in test_config.json (calibration_tines_px), or [] when any is missing.
+rakes = [];
+if ~isfile(cfgFile), return; end
+c = util.readJSON(cfgFile);
+if ~isfield(c, 'calibration_tines_px') || ~isstruct(c.calibration_tines_px), return; end
+R = c.calibration_tines_px;
+if all(cellfun(@(r) isfield(R, r) && isfield(R.(r), 'tips') && isequal(size(R.(r).tips), [5 2]), rakeNames))
+    rakes = R;
 end
 end

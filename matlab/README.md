@@ -102,6 +102,11 @@ tip of a tine**, in one window. If a rake's circles are off, press its button ("
 and click its tips (see below); the window then shows the tips again. **Continue** goes on; **Skip**
 (when the test has tine tips from before) keeps those.
 
+When the test already has tine tips (from an earlier run, clicked or found), the `tines` step shows those
+first instead of searching again: **Keep** keeps them, a rake's button clicks that rake again, and **Find
+again** searches the image as for a new test. Without the window (`review_tines = false`, or outside the
+desktop) the saved tips are kept; `runDIC(folder, 'tine_tips', 'find')` searches again.
+
 The loading branch of each deformation (the part exported) runs from the start of stretching, read
 from the tester's phase timing, to the force peak; it is found automatically.
 

@@ -18,8 +18,10 @@ s.label = '';
 % Checks shown in a window (desktop only); false skips the window, e.g. for unattended runs.
 s.review_sort = true;                  % the completeness of every cycle after sorting
 
-% Tine tips: 'auto' finds them in the image (if that fails for a rake, you are asked to click its tips);
-% 'click' asks you to click all 20 (5 per rake) when the automatic ones are wrong. Clicks are kept as clicked.
+% Tine tips: 'auto' keeps the tips saved before (shown first, to keep, click a rake again or find them
+% again) and otherwise finds them in the image (if that fails for a rake, you are asked to click its tips);
+% 'find' finds them again even when tips are saved; 'click' asks you to click all 20 (5 per rake). Clicks are
+% kept as clicked.
 s.tine_tips = 'auto';
 s.review_tines = true;                 % show the tips found and ask whether they are right
 
