@@ -1,12 +1,12 @@
 function res = measureThickness(testRoot, settings)
 % Measure a test's wall thickness from its photos (<sample>/Thickness, <ID>/test <N>/). For each photo
-% the user sets the scale (a line across one grid square or ruler tick, then a long line between grid
-% lines; the squares in between are counted), frames the strip (two corners; the view stays on it) and
-% clicks along its middle; the edges are found automatically (thicknessCore) and can be refined. One
-% strip per photo, or more on request. Returns res with H (mm, mean of every position used, all strips
+% the user sets the scale (a line across one grid spacing or ruler tick, then the scale check: a longer
+% line between grid lines, with the grid spacings in between counted), crops the strip (two corners; the
+% view stays on it) and traces its centerline; the edges are found automatically (thicknessCore) and can
+% be refined. One strip per crop; a photo can hold more than one. Returns res with H (mm, mean of every position used, all strips
 % of all photos pooled), sd, n, strips, photos and a source line, or [] when cancelled. Writes
 % <test>/thickness/: stations.csv (every position, used or why not), summary.csv (per strip, with its
-% scale and frame) and an overlay per photo.
+% scale and crop) and an overlay per photo.
 
 res = [];
 [photoDir, photos] = util.thicknessPhotos(testRoot);
@@ -265,7 +265,7 @@ res = finish();
     end
 
     function useStrip(another)
-        % Keep the strip; then the next photo, or (another) frame a further strip of this photo, with
+        % Keep the strip; then the next photo, or (another) crop a further strip of this photo, with
         % its scale kept.
         if sum(used()) < 10, set(txtErr, 'String', 'A strip needs at least 10 positions.'); return; end
         strips{end + 1} = struct('photo', photos{iPhoto}, 'strip', stripNo, 'S', S, 'pxmm', pxmm, ...
@@ -352,7 +352,7 @@ res = finish();
 
     function onMove(~, ~)
         % Crosshair over the photo; preview from the last click to the cursor: the scale line (with the
-        % live square count on the long line), the frame, or the next segment of a centerline or edge.
+        % live count of grid spacings in the scale check), the crop, or the next segment of a centerline or edge.
         if ~isvalid(hPrev), return; end
         p = ax.CurrentPoint(1, 1:2); xl = xlim(ax); yl = ylim(ax);
         inside = p(1) >= xl(1) && p(1) <= xl(2) && p(2) >= yl(1) && p(2) <= yl(2);
@@ -397,7 +397,7 @@ res = finish();
     end
 
     function wholePhoto()
-        % The frame around the strips when one is set (with 5% around it), else the whole photo.
+        % The crop when one is set (with 5% around it), else the whole photo.
         if isempty(frame)
             set(ax, 'XLim', [0.5 W + 0.5], 'YLim', [0.5 H + 0.5]);
         else

@@ -8,9 +8,11 @@ function cfg = findTineTips(testRoot, label, settings)
 % across the rods is searched for narrow dark dips; dips that line up across the band are fitted with a
 % straight line per rod. Tips: each rod is followed inward along its line; the tip is the end of the
 % rod-dark stretch at the largest sustained step up in brightness (rod to tissue). Tips far from their
-% rake's median are searched again. Every tip is then refined with the scale calibration's tip finder.
-% A self-check (five rods per rake, tips of a rake within 35 px of each other, a clear step at every tip)
-% stops the run if it fails: check DIC_results/config_tine_tips.png.
+% rake's median are searched again. Every tip found is then refined with the scale calibration's tip
+% finder. A self-check (five rods per rake, tips of a rake within 35 px of each other, a clear step at
+% every tip) runs on each rake; a rake that fails it takes its tines saved before, else its tips are
+% clicked (desktop), else the run stops. With settings.review_tines the tips are shown and any rake can
+% be clicked again; clicked tips are kept as clicked. Check DIC_results/config_tine_tips.png.
 
 C.N_RODS = 5;
 C.BANDS = [0.10 0.27; 0.04 0.18; 0.08 0.20; 0.16 0.30];

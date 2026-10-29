@@ -7,7 +7,8 @@ digital image correlation (DIC), checks the tracking for local errors and writes
 frame of every loading curve: CSV files, and an Excel file in the layout of CellScale's own AllData
 export. A tracking report shows the tracking of every protocol at the end.
 
-It runs on Windows, macOS and Linux with **MATLAB R2021a or later and no toolboxes**.
+It runs on Windows, macOS and Linux with **MATLAB R2021a or later and no toolboxes** (the Parallel
+Computing Toolbox, when installed, speeds up the tracking on computers with many cores; see "Settings").
 
 For a first run, print `QUICKSTART.pdf`: every window in order, with screenshots and what to answer
 (its source, with the screenshots, is in `quickstart\`).
@@ -119,8 +120,8 @@ If the tine tips can't be found automatically on one side, `runDIC` shows the im
 **click the 5 tine tips of that rake**. Click the end of each rod, where it meets the tissue; a red
 cross marks each click, and a right-click (or Backspace) removes the last one. The window opens zoomed on
 the rake; scroll to zoom further where the pointer is, and **Done** (or Enter) takes the 5 clicks, which
-are kept as clicked. If the tips were found but some red circles are off, click all 20 yourself and redo the
-later steps:
+are kept as clicked. The same window opens for a rake clicked again in the tine-tip window. To click all
+20 tips without the automatic search:
 
 ```matlab
 runDIC(folder, 'tine_tips', 'click')
@@ -210,8 +211,8 @@ example from the thickness workbook, or click **Measure from the photos** (below
 when the test has no photos). After measuring, the window comes back with the result in the test's box
 (yellow, with its spread and the thickness saved before beside it); **OK** saves it, and **Revert** puts
 that box back as it was. A typed value turns the box yellow too. A blank box, or a saved thickness left
-as it is, changes nothing; a test without a thickness has `NaN` stress columns. Without the `thickness` step, the window opens only for
-tests that have no thickness. The thickness is saved in the test's `test_config.json`, with where it came
+as it is, changes nothing; a test without a thickness has `NaN` stress columns. Without the `thickness`
+step, the window opens (when exporting) only for tests that have no thickness. The thickness is saved in the test's `test_config.json`, with where it came
 from (`typed`, or the photos, strips and positions measured).
 
 ### Measuring from the photos
@@ -281,7 +282,8 @@ after it.
 ## If a run stops
 
 When a test fails, the Command Window prints `=== test… FAILED:` and the reason; in a sample folder, the
-other tests still run. Ctrl-C in the Command Window stops a run. Running `runDIC` again on the same
+other tests still run. **Cancel** in any window, or Ctrl-C in the Command Window during tracking, stops a
+run. Running `runDIC` again on the same
 folder marks the steps already done; pick the others. A tracking step that was interrupted starts over.
 
 ## Settings

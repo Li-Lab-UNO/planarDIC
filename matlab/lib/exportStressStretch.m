@@ -15,7 +15,7 @@ function T = exportStressStretch(testRoot, settings)
 
 cfg = util.readJSON(fullfile(testRoot, 'test_config.json'));
 w = cfg.widths_mm.tine_span;                   % [w_theta w_z] mm
-[H, Hsource] = util.thickness(testRoot, settings);
+[H, Hsource] = util.thickness(testRoot);
 P = util.phaseTiming(testRoot);
 D = util.dataTable(testRoot);
 C4 = cellscalePoints(testRoot);

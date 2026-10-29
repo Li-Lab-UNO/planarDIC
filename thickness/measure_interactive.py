@@ -1,16 +1,16 @@
 """
 Measure a test's wall thickness from its photos (<SAMPLE>/Thickness, <ID>/test <N>/), interactively: the
 Python version of the MATLAB version's measureThickness, step for step. For each photo the user sets the
-scale (a line across one grid square or ruler tick, then a long line between grid lines; the squares in
-between are counted), frames the strip (two corners; the view stays on it) and clicks along its middle; the
-edges are found automatically (strip_edges.py) and can be refined (remove a section, redraw the centerline,
-click the edges by hand). One strip per photo, or more on request.
+scale (a line across one grid spacing or ruler tick, then the scale check: a longer line between grid lines,
+with the grid spacings in between counted), crops the strip (two corners; the view stays on it) and traces
+its centerline; the edges are found automatically (strip_edges.py) and can be refined (remove a section,
+redraw the centerline, click the edges by hand). One strip per crop; a photo can hold more than one.
 
 The thickness is the mean of every position used, all strips of all photos pooled, saved in the test's
 test_config.json as thickness_mm (H, H_sd, source). When the test already has a thickness, the window
 first asks whether to keep it or measure again. When nothing is measured (no photos, or the window closed)
 and the test has no thickness, a box asks to type one (source "typed"). Results go to <test>/thickness/:
-stations.csv (every position, used or why not), summary.csv (per strip, with its scale and frame) and an
+stations.csv (every position, used or why not), summary.csv (per strip, with its scale and crop) and an
 overlay per photo.
 
     .venv/bin/python thickness/measure_interactive.py --test N1757/test1

@@ -265,7 +265,7 @@ A strip needs at least 10 positions. Right-click or Backspace removes the last c
 Enter proceeds as the step's first button does. The thickness is the mean of every position used, all
 strips of all photos together, saved in `test_config.json` as `thickness_mm` (`H`, `H_sd`, `source`),
 with `<test>/thickness/`: `stations.csv` (every position, used or why not), `summary.csv` (per strip,
-with its scale and frame) and an overlay per photo. Closing the window saves nothing; a test without a
+with its scale and crop) and an overlay per photo. Closing the window saves nothing; a test without a
 thickness then gets a box to type one, as does a test without photos (the source is then `typed`).
 
 ```bash

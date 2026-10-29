@@ -18,11 +18,13 @@ function runDIC(folder, varargin)
 %   scale   image scale from the tine motion in Def01 and Def19 -> scale_calibration.json
 %           check DIC_results/scale_calibration.png
 %   widths  tine spans (specimen widths for the stresses) -> test_config.json
-%   track   DIC tracking of Def01-Def19 (the loading branches) -> DIC_results/DefNN_*.mat
+%   track   DIC tracking of the deformations picked in the tracking window (Def11-Def19 by default; the
+%           loading branches, or the whole cycles) -> DIC_results/DefNN_*.mat
 %   artifacts  finds local tracking errors (a speckle particle sliding over the tissue, a shifting glare
 %           patch), excludes them in test_config.json and tracks again -> DIC_results/artifact_check.png
-%   export  stress-stretch CSVs -> stress_stretch/ (one per protocol and all_protocols.csv), and the loading
-%           branches of Def01-Def19 in CellScale's AllData layout -> stress_stretch/stress-stretch test<N>.AllData.xlsx
+%   export  the deformations and files picked in the export window (Def11-Def19 by default): stress-stretch
+%           CSVs and plot -> stress_stretch/, and the loading branches in CellScale's AllData layout ->
+%           stress_stretch/stress-stretch test<N>.AllData.xlsx
 %   report  the tracking report (viewTracking) of the existing tracks; it also opens at the end of a run
 %           that tracked
 
@@ -205,7 +207,7 @@ function askThickness(tests, s, every)
 if every
     shown = tests;
 else
-    shown = tests(cellfun(@(t) isnan(util.thickness(t, s)), tests));
+    shown = tests(cellfun(@(t) isnan(util.thickness(t)), tests));
 end
 if isempty(shown), return; end
 n = numel(shown);

@@ -10,7 +10,8 @@ function viewTracking(testRoot, settings)
 % filled from the neighbors), every 4th grid row and column, and the stretches, valid points and match
 % quality (ZNCC) of the frame shown. One slider moves all of them by percent of their loading branch.
 % Tiles marked Problem (red) or Check (amber) fall below the limits in DIC_settings.m; the window opens
-% at the worst frame of the worst one. "Open large" shows the selected deformation in a big viewer.
+% at the worst frame of the worst one. "Open large" shows the selected deformation in a big viewer;
+% "Finish" closes the report.
 % Images are read as they are shown, so it needs little memory; playback keeps time on slow computers
 % by showing fewer frames.
 

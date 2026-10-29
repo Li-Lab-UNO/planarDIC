@@ -3,12 +3,12 @@ function s = DIC_settings()
 % project and normally need no change.
 
 % ---- what to run
-% Steps, in order: 'info' (sample label and notes), 'thickness' (measure the thickness from the photos;
-% typed or measured, in the thickness window), 'sort' (images into one folder per
-% cycle, with a completeness check), 'tines' (find the tine tips), 'scale' (image scale), 'widths' (tine
-% spans), 'track' (DIC), 'artifacts' (find and exclude local
-% tracking errors, then track again if any), 'export' (stress-stretch CSVs and the AllData file),
-% 'report' (open the tracking report; it reads the existing tracks, so it can be chosen alone).
+% Steps, in order: 'info' (sample label and notes), 'thickness' (the thickness window: typed, or measured
+% from the photos), 'sort' (images into one folder per cycle, with a completeness check), 'tines' (find
+% the tine tips), 'scale' (image scale), 'widths' (tine spans), 'track' (DIC), 'artifacts' (find and
+% exclude local tracking errors, then track again if any), 'export' (stress-stretch CSVs, plot and the
+% AllData file), 'report' (open the tracking report; it reads the existing tracks, so it can be chosen
+% alone).
 s.steps = {'info', 'thickness', 'sort', 'tines', 'scale', 'widths', 'track', 'artifacts', 'export', 'report'};
 
 % Label added to the sample name in test_config.json (for example 'healthy'); '' for none. The 'info'
@@ -41,13 +41,13 @@ s.deformations = 11:19;                % analyzed: the CSVs and the tracking rep
 s.track_deformations = 11:19;         % tracked (fills in the tracking window); 1:19 adds the preconditioning, only for the AllData file's rows
 s.calibration_deformations = [1 19];   % used for the image scale
 s.loading_only = true;                 % track each deformation only up to the end of its loading branch
-s.ask_tracking = true;                 % ask at the start which deformations to track, and loading only or the whole cycle (desktop only)
+s.ask_tracking = true;                 % ask which deformations to track, and loading only or the whole cycle, after the tine tips (desktop only)
 % Export: the deformations and the files written by the export step. Formats: 'csv' (one CSV per
 % protocol), 'all_csv' (all_protocols.csv), 'png', 'pdf' and 'fig' (the stress-stretch plot), 'xlsx'
 % (the AllData file in CellScale's layout). README.txt is always written.
 s.export_deformations = 11:19;
 s.export_formats = {'csv', 'all_csv', 'png', 'xlsx'};
-s.ask_export = true;                   % ask at the start which deformations and files to export (desktop only)
+s.ask_export = true;                   % ask which deformations and files to export, once the tracking is done (desktop only)
 
 % ---- DIC (physical sizes, mm)
 s.target_px_per_mm = 50;               % images are resampled (down only) to this scale before tracking
@@ -63,7 +63,7 @@ s.review_tracking = true;              % open the tracking report at the end of 
 
 % ---- computing
 % MATLAB's matching already uses several CPU cores, so on a computer with up to about 10 cores the
-% deformations are tracked one after another (about 13 min for the 19 deformations of a test on a 10-core
+% deformations are tracked one after another (about 13 min for Def11-Def19 of a test on a 10-core
 % computer; tracking several at once was slower there). With more cores, several deformations are tracked
 % at once, which needs the Parallel Computing Toolbox: each worker tracks one deformation with its share
 % of the cores, and needs about 0.6 GB.

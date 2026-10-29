@@ -11,7 +11,7 @@ function exportAllData(testRoot, settings)
 
 cfg = util.readJSON(fullfile(testRoot, 'test_config.json'));
 w = cfg.widths_mm.tine_span;                       % [w_theta w_z]: across the X force, across the Y force
-[H, Hsource] = util.thickness(testRoot, settings);
+[H, Hsource] = util.thickness(testRoot);
 P = util.phaseTiming(testRoot);
 D = util.dataTable(testRoot);
 raw = readtable(util.firstFile(testRoot, '*Data.csv'), 'VariableNamingRule', 'preserve', 'Encoding', 'latin1', ...

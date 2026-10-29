@@ -75,8 +75,8 @@ classdef thicknessCore
         end
 
         function [pxmm, N, ratio] = scaleFromLines(L1, L2, sizeMm)
-            % Scale from a line across one square (length L1 px) and a long line (L2 px) between grid
-            % lines: N = whole squares in the long line, ratio = L2 / L1 (should be near N).
+            % Scale from a line across one grid spacing (length L1 px) and the scale-check line (L2 px)
+            % between grid lines: N = whole spacings in L2, ratio = L2 / L1 (should be near N).
             ratio = L2 / L1;
             N = max(1, round(ratio));
             pxmm = L2 / (N * sizeMm);

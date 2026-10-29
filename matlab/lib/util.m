@@ -143,7 +143,7 @@ classdef util
             end
         end
 
-        function [H, src] = thickness(testRoot, ~)
+        function [H, src] = thickness(testRoot)
             % Thickness (mm) for the stresses: thickness_mm.H of the test's test_config.json (written by
             % the thickness window, or by the Python pipeline), else NaN.
             H = NaN; src = 'not set';
