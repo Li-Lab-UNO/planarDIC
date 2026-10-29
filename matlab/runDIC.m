@@ -397,13 +397,14 @@ end
 function [defs, formats, skip] = chooseExport(testRoot, s)
 % Ask which deformations of the test to export and which files to write, filled in with the answer for
 % the previous test of the run, else the settings (export_deformations, export_formats). Deformations not
-% tracked are grayed out. When files were exported before, Skip leaves the export out (skip true).
+% tracked are grayed out, and so is the preconditioning plot when none of Def01-Def10 is. When files were exported before, Skip leaves the export out (skip true).
 c = s.choices;
 if isKey(c, 'export_defs'), s.export_deformations = c('export_defs'); s.export_formats = c('export_formats'); end
 d = dir(fullfile(testRoot, 'DIC_results', 'Def*.mat'));
 avail = unique(cellfun(@(x) sscanf(x, 'Def%d'), {d.name}));
 fmt = {'csv', 'One CSV per protocol (DefNN_<name>.csv)'; 'all_csv', 'All protocols in one CSV (all_protocols.csv)'; ...
        'png', 'Stress-stretch plot, PNG'; 'pdf', 'Stress-stretch plot, PDF'; 'fig', 'Stress-stretch plot, MATLAB figure (.fig)'; ...
+       'precond', 'Preconditioning plot (Def01-Def10 tracked), in the plot formats above, else PNG'; ...
        'xlsx', 'AllData file, CellScale''s layout (.xlsx)'};
 W = 660; Hfig = 500;                                      % in pixels; buttons as in MATLAB's own dialogs
 fig = figure('Name', 'runDIC: what to export', 'NumberTitle', 'off', 'Color', 'w', 'MenuBar', 'none', ...
@@ -439,6 +440,10 @@ fbox = gobjects(nf, 1);
 for k = 1:nf
     fbox(k) = uicontrol(grp, 'Style', 'checkbox', 'Position', [10 (nf - k) * 20 + 4 W - 70 18], 'BackgroundColor', 'w', ...
                         'String', fmt{k, 2}, 'Value', ismember(fmt{k, 1}, s.export_formats));
+end
+k = find(strcmp(fmt(:, 1), 'precond'));
+if ~any(avail <= 10)                                      % offered only when a preconditioning cycle is tracked
+    set(fbox(k), 'Value', 0, 'Enable', 'off', 'String', 'Preconditioning plot (Def01-Def10 not tracked)');
 end
 old = [dir(fullfile(testRoot, 'stress_stretch', '*.csv')); dir(fullfile(testRoot, 'stress_stretch', '*.xlsx'))];
 skipLabel = repmat({'Skip'}, 1, ~isempty(old));

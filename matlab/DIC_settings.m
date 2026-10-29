@@ -43,8 +43,9 @@ s.calibration_deformations = [1 19];   % used for the image scale
 s.loading_only = true;                 % track each deformation only up to the end of its loading branch
 s.ask_tracking = true;                 % ask which deformations to track, and loading only or the whole cycle, after the tine tips (desktop only)
 % Export: the deformations and the files written by the export step. Formats: 'csv' (one CSV per
-% protocol), 'all_csv' (all_protocols.csv), 'png', 'pdf' and 'fig' (the stress-stretch plot), 'xlsx'
-% (the AllData file in CellScale's layout). README.txt is always written.
+% protocol), 'all_csv' (all_protocols.csv), 'png', 'pdf' and 'fig' (the stress-stretch plot), 'precond'
+% (a plot of the tracked preconditioning cycles, Def01-Def10, of its own), 'xlsx' (the AllData file in
+% CellScale's layout). README.txt is always written.
 s.export_deformations = 11:19;
 s.export_formats = {'csv', 'all_csv', 'png', 'fig', 'xlsx'};
 s.ask_export = true;                   % ask which deformations and files to export, once the tracking is done (desktop only)

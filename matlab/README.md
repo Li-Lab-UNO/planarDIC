@@ -159,6 +159,7 @@ The results are in the test's `stress_stretch` folder, the files picked in the e
 | `all_protocols.csv` | every loading curve exported, one row per image frame |
 | `Def11_Equibiaxial.csv`, … `Def19_….csv` | the same, one file per protocol |
 | `stress_stretch.png`, `.pdf`, `.fig` | every protocol exported on one plot, to check the data at a glance (the `.fig` opens in MATLAB, to edit) |
+| `stress_stretch_preconditioning.png`, … | the tracked preconditioning cycles (Def01–Def10) on a plot of their own, when picked in the export window (offered only when they are tracked); they are then left out of the main plot |
 | `stress-stretch test<N>.AllData.xlsx` | the AllData file (below) |
 | `README.txt` | always written: the protocols exported, what the columns are; the label and notes, widths, thickness, scale, tracking verdict and any loading branches set by hand |
 
