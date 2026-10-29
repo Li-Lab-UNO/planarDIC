@@ -144,7 +144,7 @@ function plotStressStretch(T, H, cfg, base, formats)
 % base.png, base.pdf and/or base.fig (formats).
 if isfinite(H), yz = T.stress_zz_kPa; yt = T.stress_thetatheta_kPa; yl = 'Cauchy stress (kPa)';
 else, yz = T.tension_z_N_per_m; yt = T.tension_theta_N_per_m; yl = 'membrane tension (N/m)'; end
-fig = figure('Visible', 'off', 'Color', 'w', 'Position', [100 100 900 700]);
+fig = figure('Visible', 'off', 'Color', 'w', 'Position', [100 100 900 600]);   % 3:2 (landscape)
 hold on
 cols = [31 119 180; 255 127 14; 44 160 44; 214 39 40; 148 103 189; 140 86 75; 227 119 194; 127 127 127; 188 189 34] / 255;
 protos = unique(T.protocol, 'stable');
@@ -156,6 +156,7 @@ for i = 1:numel(protos)
 end
 xlabel('Stretch'); ylabel(yl); grid on; legend('Location', 'northwest', 'Interpreter', 'none');
 xlim([1 1.6]);
+set(gca, 'FontSize', get(gca, 'FontSize') + 1);                 % labels, ticks, legend and title one point larger
 if isfinite(H), ylim([0 120]); end                          % kPa; tensions (no thickness) keep their own range
 title({regexprep(strrep(cfg.sample, '_', ' '), ',\s*labeled\s+', ', ', 'ignorecase'), 'circles: axial (\lambda_z), triangles: circumferential (\lambda_\theta)'});
 for f = formats

@@ -46,7 +46,7 @@ s.ask_tracking = true;                 % ask which deformations to track, and lo
 % protocol), 'all_csv' (all_protocols.csv), 'png', 'pdf' and 'fig' (the stress-stretch plot), 'xlsx'
 % (the AllData file in CellScale's layout). README.txt is always written.
 s.export_deformations = 11:19;
-s.export_formats = {'csv', 'all_csv', 'png', 'xlsx'};
+s.export_formats = {'csv', 'all_csv', 'png', 'fig', 'xlsx'};
 s.ask_export = true;                   % ask which deformations and files to export, once the tracking is done (desktop only)
 
 % ---- DIC (physical sizes, mm)
