@@ -154,8 +154,10 @@ for i = 1:numel(protos)
     plot(T.lambda_z(m), yz(m), 'o', 'Color', c, 'MarkerSize', 4.5, 'LineWidth', 1, 'DisplayName', sprintf('%s %s', protos{i}, T.protocol_name{find(m, 1)}));
     plot(T.lambda_theta(m), yt(m), '^', 'Color', c, 'MarkerSize', 4.5, 'LineWidth', 1, 'HandleVisibility', 'off');
 end
-xlabel('stretch'); ylabel(yl); grid on; legend('Location', 'northwest', 'Interpreter', 'none');
-title({strrep(cfg.sample, '_', ' '), 'circles: axial (\lambda_z), triangles: circumferential (\lambda_\theta)'});
+xlabel('Stretch'); ylabel(yl); grid on; legend('Location', 'northwest', 'Interpreter', 'none');
+xlim([1 1.6]);
+if isfinite(H), ylim([0 120]); end                          % kPa; tensions (no thickness) keep their own range
+title({regexprep(strrep(cfg.sample, '_', ' '), ',\s*labeled\s+', ', ', 'ignorecase'), 'circles: axial (\lambda_z), triangles: circumferential (\lambda_\theta)'});
 for f = formats
     switch f{1}
         case 'png', print(fig, [base '.png'], '-dpng', '-r100');
