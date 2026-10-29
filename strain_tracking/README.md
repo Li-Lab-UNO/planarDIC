@@ -116,16 +116,16 @@ in mm, the same for all samples and tests:
 
 | Setting | Value | Used by |
 |---|---|---|
-| `target_px_per_mm` | 50 | images are resampled to this scale before tracking (area averaging, downsampling only) |
-| `subset_mm` | 1.0 | subset side; radius = round((subset_mm × px/mm − 1) / 2) at the tracking scale (51 px) |
-| `step_mm` | 0.2 | grid step, rounded to whole px (10 px) |
+| `target_px_per_mm` | 30 | images are resampled to this scale before tracking (area averaging, downsampling only); below the lowest native scale of the tests so far (about 35 px/mm), so every test is tracked at the same scale |
+| `subset_mm` | 1.0 | subset side; radius = round((subset_mm × px/mm − 1) / 2) at the tracking scale (31 px) |
+| `step_mm` | 0.2 | grid step, rounded to whole px (6 px) |
 | `window_mm` | 1.5 | Gaussian strain window (equivalent box width) for F, J, E in every export and figure |
 | `edge_mm` | z 1.5, θ 2.0 | interior for J/mean, spread and low spot: at least 1.5 mm from the left/right (axial) tine-tip lines and 2.0 mm from the top/bottom (circumferential) ones. User-set: edit it here, or pass `--edge-mm Z TH` to `peak_j_figure.py` / `compare_peak_j.py` for one run. `edge_effects.py` reports where the tine-pitch modulation of the normal stretch decays to the core level against it; on the tests so far that was mostly within 1.6 mm of the left/right lines and 2.0 mm of the top/bottom lines (a few tests up to 2.2–2.4 mm, by one or two 0.2 mm bins). Both values clear the strain-window floor (about 1.2 mm). Where a rake's outermost tine stops well short of a corner, that corner is under-stretched and can reach into the interior |
 | `low_spot_box_mm` | [3, 2] | low-spot box (z, θ) |
 
 **Resampling.** Each test's images are resampled to `target_px_per_mm` with its own
-`scale_calibration.json` (factor = 50 / native px/mm, e.g. 0.80 at 62.8 px/mm), so every test
-is matched with the same px as well as the same mm: 51 px subsets on a 10 px grid. Px-based parts
+`scale_calibration.json` (factor = 30 / native px/mm, e.g. 0.48 at 62.8 px/mm), so every test
+is matched with the same px as well as the same mm: 31 px subsets on a 6 px grid. Px-based parts
 of the tracker (median-test tolerance, convergence, pre-blur, interpolation) and the displacement
 noise in mm are then the same for every specimen, and tracking time no longer grows with zoom.
 Saturated glints are detected on the native image; a resampled pixel is usable only if all of it
@@ -134,7 +134,9 @@ tracks are saved back in native image px, so configs, photos and CellScale point
 track records `px_per_mm` (native), `resample`, `track_px_per_mm`, `subset_mm` and `step_mm`;
 `radius` is in the resampled px. On N1739 test1 Def11, tracking at 50 px/mm instead of native
 62.8 px/mm changed peak displacements by a median of 0.20 px (3 µm) and J/mean by an RMS of
-0.0017 (r = 0.999), with 99.9% instead of 99.6% of points valid per frame.
+0.0017 (r = 0.999), with 99.9% instead of 99.6% of points valid per frame. Tracking it at 30 instead of
+50 px/mm changed the peak stretches by at most 0.0013, kept the J pattern and lowered the J noise
+between neighboring points slightly (median ZNCC 0.996 instead of 0.992 in the worst frame).
 
 The effective strain resolution is about √(window_mm² + subset_mm²) ≈ 1.8 mm. `--radius` /
 `--step` (resampled px) and `--win` (a square window in grid points) still override the settings.

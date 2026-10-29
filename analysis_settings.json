@@ -1,5 +1,5 @@
 {
-  "target_px_per_mm": 50.0,
+  "target_px_per_mm": 30.0,
   "subset_mm": 1.0,
   "step_mm": 0.2,
   "window_mm": 1.5,

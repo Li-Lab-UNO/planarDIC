@@ -50,7 +50,7 @@ s.export_formats = {'csv', 'all_csv', 'png', 'xlsx'};
 s.ask_export = true;                   % ask which deformations and files to export, once the tracking is done (desktop only)
 
 % ---- DIC (physical sizes, mm)
-s.target_px_per_mm = 50;               % images are resampled (down only) to this scale before tracking
+s.target_px_per_mm = 30;               % images are resampled (down only) to this scale before tracking
 s.subset_mm = 1.0;                     % subset size
 s.step_mm = 0.2;                       % grid spacing
 
