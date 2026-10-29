@@ -58,6 +58,13 @@ if interactive && ~any(strcmp(varargin(1:2:end), 'steps'))
     if isempty(s.steps), util.log('Run cancelled at the step list, nothing run.'); return; end
 end
 
+[sampleDir, tn] = fileparts(tests{1});
+if isscalar(tests)
+    util.log('=== %s (1 of 1)', tn);             % first, so the windows asked up front come under it
+else
+    [~, sample] = fileparts(sampleDir);
+    util.log('=== %s: %d tests', sample, numel(tests));
+end
 try
     if any(strcmp(s.steps, 'info')) && usejava('desktop')
         util.log('-- label and notes'); askInfo(tests);   % up front too
@@ -78,7 +85,7 @@ done = false(size(tests));
 for i = 1:numel(tests)
     t0 = tic;
     [~, tn] = fileparts(tests{i});
-    util.log('\n=== %s (%d of %d)', tn, i, numel(tests));
+    if ~isscalar(tests), util.log('=== %s (%d of %d)', tn, i, numel(tests)); end
     try
         runSteps(tests{i}, s);
         done(i) = true;

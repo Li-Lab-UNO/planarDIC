@@ -90,8 +90,9 @@ drawAll(true);
         fp = getpixelposition(fig); yb = round(0.033 * fp(4));
         pb = get(btnPlay, 'Position'); set(btnPlay, 'Position', [round(0.01 * fp(3)) yb pb(3:4)]);
         set(popSpeed, 'Position', [round(0.075 * fp(3)) yb 70 22]);
-        pf = get(btnFinish, 'Position'); set(btnFinish, 'Position', [round(0.99 * fp(3)) - pf(3) yb pf(3:4)]);
-        pl = get(btnLarge, 'Position'); set(btnLarge, 'Position', [pf(1) - 8 - pl(3) yb pl(3:4)]);
+        pf = get(btnFinish, 'Position'); xf = round(0.99 * fp(3)) - pf(3);
+        set(btnFinish, 'Position', [xf yb pf(3:4)]);
+        pl = get(btnLarge, 'Position'); set(btnLarge, 'Position', [xf - 8 - pl(3) yb pl(3:4)]);   % left of Finish
     end
 
     function T = makeTile(i, col, row)
