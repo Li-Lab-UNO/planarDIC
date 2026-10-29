@@ -16,7 +16,6 @@ overlay per photo.
     .venv/bin/python thickness/measure_interactive.py --test N1757/test1
 """
 import argparse
-import glob
 import os
 import re
 import sys
@@ -40,14 +39,23 @@ CLICK = "#ff0000"                # the clicks and the line following the cursor
 
 
 def photos_of(root):
-    """The thickness photo folder of a test, <sample>/Thickness*/test <N> (or test<N>), and its .jpg photos."""
-    m = re.match(r"test(\d+)", os.path.basename(root))
+    """The thickness photo folder of a test, <sample>/Thickness*/test <N>, and its .jpg photos. Names are matched
+    ignoring case, with or without the space ("Test 1", "test1"), since Linux file names are case-sensitive."""
+    m = re.match(r"(?i)test(\d+)", os.path.basename(root))
     if not m:
         return None, []
-    for d in sorted(glob.glob(os.path.join(os.path.dirname(root), "Thickness*"))):
-        for cand in (f"test {m[1]}", f"test{m[1]}"):
-            f = os.path.join(d, cand)
-            p = sorted(x for x in os.listdir(f) if re.search(r"\.jpe?g$", x, re.I)) if os.path.isdir(f) else []
+
+    def subfolders(parent, pattern):
+        return sorted(x for x in os.listdir(parent)
+                      if re.search(pattern, x, re.I) and os.path.isdir(os.path.join(parent, x)))
+
+    sample = os.path.dirname(root)
+    for d in subfolders(sample, r"^thickness"):
+        for t in subfolders(os.path.join(sample, d), r"^test\s*(\d+)$"):
+            if int(re.search(r"\d+", t)[0]) != int(m[1]):
+                continue
+            f = os.path.join(sample, d, t)
+            p = sorted(x for x in os.listdir(f) if re.search(r"\.jpe?g$", x, re.I))
             if p:
                 return f, p
     return None, []

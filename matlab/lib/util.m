@@ -126,21 +126,29 @@ classdef util
         end
 
         function [folder, photos] = thicknessPhotos(testRoot)
-            % The thickness photo folder of a test, <sample>/Thickness*/test <N> (or test<N>), and its
-            % .jpg photos; '' and {} when there is none.
+            % The thickness photo folder of a test, <sample>/Thickness*/test <N>, and its .jpg photos; ''
+            % and {} when there is none. Names are matched ignoring case, with or without the space ("Test 1",
+            % "test1"), since Linux file names are case-sensitive.
             folder = ''; photos = {};
             [sampleDir, name] = fileparts(testRoot);
-            n = regexp(name, '^test(\d+)', 'tokens', 'once');
+            n = regexpi(name, '^test(\d+)', 'tokens', 'once');
             if isempty(n), return; end
-            for d = dir(fullfile(sampleDir, 'Thickness*'))'
-                for cand = {sprintf('test %s', n{1}), sprintf('test%s', n{1})}
-                    f = fullfile(d.folder, d.name, cand{1});
-                    if ~isfolder(f), continue; end
+            for d = util.subfolders(sampleDir, '^thickness')
+                for t = util.subfolders(fullfile(sampleDir, d{1}), '^test\s*(\d+)$')
+                    if str2double(regexpi(t{1}, '\d+', 'match', 'once')) ~= str2double(n{1}), continue; end
+                    f = fullfile(sampleDir, d{1}, t{1});
                     p = dir(f); p = {p(~[p.isdir]).name};
                     p = p(~cellfun(@isempty, regexpi(p, '\.jpe?g$', 'once')));
                     if ~isempty(p), folder = f; photos = sort(p); return; end
                 end
             end
+        end
+
+        function names = subfolders(parent, pattern)
+            % Names of the folders in parent matching the regular expression pattern, ignoring case, sorted.
+            d = dir(parent);
+            names = sort({d([d.isdir]).name});
+            names = names(~cellfun(@isempty, regexpi(names, pattern, 'once')));
         end
 
         function [H, src] = thickness(testRoot)

@@ -218,7 +218,9 @@ from (`typed`, or the photos, strips and positions measured).
 ### Measuring from the photos
 
 The photos of a test's strips, lying on their cut face on the blue cutting mat or the steel ruler, are
-in the sample folder's `Thickness, <ID>\test <N>` folder (for example `Thickness, 1900\test 1`). Each
+in the sample folder's `Thickness, <ID>\test <N>` folder (for example `Thickness, 1900\test 1`). Any folder
+whose name starts with "Thickness" is searched, and the test folder is found whatever its capitals and with or
+without the space (`test 1`, `Test 1`, `test1`). Each
 photo is opened in turn; scroll to zoom where the pointer is.
 
 1. **Scale, 1 grid spacing.** Click on one grid line and then on the next one, straight across one grid
