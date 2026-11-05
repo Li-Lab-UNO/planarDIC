@@ -55,7 +55,9 @@ s.ask_export = true;                   % ask which deformations and files to exp
 % ---- DIC (physical sizes, mm)
 s.target_px_per_mm = 30;               % images are resampled (down only) to this scale before tracking
 s.subset_mm = 1.0;                     % subset size
-s.step_mm = 0.2;                       % grid spacing
+s.step_mm = 0.4;                       % grid spacing: 0.4 tracks about 4x fewer points than 0.2 and a test in about
+                                       % half the time; the stresses differ by at most 0.15%, but the artifact check
+                                       % only finds artifacts about twice as large. Use one value for all tests
 
 % ---- tracking report (viewTracking; DIC_results/tracking_report.csv)
 % A deformation is Good when its worst frame has at least tracking_good(1) % of the points tracked and a
@@ -66,7 +68,7 @@ s.review_tracking = true;              % open the tracking report at the end of 
 
 % ---- computing
 % MATLAB's matching already uses several CPU cores, so on a computer with up to about 10 cores the
-% deformations are tracked one after another (about 13 min for Def11-Def19 of a test on a 10-core
+% deformations are tracked one after another (about 1.5-2 min for Def11-Def19 of a test on a 10-core
 % computer; tracking several at once was slower there). With more cores, several deformations are tracked
 % at once, which needs the Parallel Computing Toolbox: each worker tracks one deformation with its share
 % of the cores, and needs about 0.6 GB.

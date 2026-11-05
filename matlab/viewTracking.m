@@ -7,7 +7,7 @@ function viewTracking(testRoot, settings)
 %
 % runDIC opens it at the end of a run that tracked (review_tracking in DIC_settings.m). Each tile shows
 % one deformation: the tracked points over the images (green: tracked, red: failed in that frame and
-% filled from the neighbors), every 4th grid row and column, and the stretches, valid points and match
+% filled from the neighbors), grid rows and columns about every 0.8 mm, and the stretches, valid points and match
 % quality (ZNCC) of the frame shown. One slider moves all of them by percent of their loading branch.
 % Tiles marked Problem (red) or Check (amber) fall below the limits in DIC_settings.m; the window opens
 % at the worst frame of the worst one. "Open large" shows the selected deformation in a big viewer;
@@ -33,7 +33,6 @@ n = numel(R);
 nExcl = 0;
 if isfield(cfg, 'dic') && isfield(cfg.dic, 'exclude_px'), nExcl = numel(cfg.dic.exclude_px) / 4; end
 
-LINE_EVERY = 4;
 TILE_PX = 360;                                   % displayed tile size (image px): images are subsampled to it
 speeds = [1 2 5 10];
 COL = struct('good', [0.15 0.55 0.15], 'check', [0.85 0.55 0], 'problem', [0.85 0.1 0.1]);
@@ -102,7 +101,8 @@ drawAll(true);
         ax = axes(fig, 'Units', 'normalized', 'Position', [0.01 + col * w + 0.01, 0.095 + (nr - 1 - row) * h + 0.05, w - 0.02, h - 0.085]);
         T = struct('ax', ax);
         T.trk = load(fullfile(testRoot, 'DIC_results', [R(i).name '.mat']), 'posx', 'posy', 'valid', 'zncc', ...
-                     'frames', 'times', 'X0', 'shape');
+                     'frames', 'times', 'X0', 'shape', 'step_mm');
+        if ~isfield(T.trk, 'step_mm'), T.trk.step_mm = NaN; end     % a track without it: every 4th row and column
         T.imgDir = fullfile(testRoot, 'Images', R(i).name);
         info = imfinfo(fullfile(T.imgDir, [T.trk.frames{1} '.jpg']));
         z = cfg.tine_tips_px.z + 1; t = cfg.tine_tips_px.theta + 1;
@@ -151,7 +151,7 @@ drawAll(true);
             set([T.hGood T.hBad], 'XData', NaN, 'YData', NaN);
         end
         if get(chkGrid, 'Value')
-            [gx, gy] = trackGridLines(x, y, trk.shape, LINE_EVERY);
+            [gx, gy] = trackGridLines(x, y, trk.shape, trk.step_mm);
             set(T.hGrid, 'XData', T.toX(gx), 'YData', T.toY(gy));
         else
             set(T.hGrid, 'XData', NaN, 'YData', NaN);

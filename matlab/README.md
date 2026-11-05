@@ -80,9 +80,9 @@ You can also give the folder directly, which runs the default steps without the 
 runDIC('C:\Data\N1900_LFPA\test1_10142026_PLC25_40-12')
 ```
 
-A test (Def11–Def19 tracked) takes about 15 minutes on a recent 10-core computer, most of it tracking,
-and twice that with Def01–Def10 too; longer on a laptop with fewer cores. Progress is printed in the
-Command Window.
+Tracking Def11–Def19 of a test, checking it and exporting take about 2 minutes on a recent 10-core
+computer, and about twice that with Def01–Def10 too; several times longer on an older computer or a
+laptop. The windows you answer come on top of that. Progress is printed in the Command Window.
 
 ## What to check
 
@@ -136,7 +136,7 @@ runDIC(folder, 'tine_tips', 'click')
 
 At the end of a run, `runDIC` opens the **tracking report** of each test it tracked: the analyzed
 deformations (Def11–Def19) side by side, each with the tracked points over the images (green: tracked,
-red: failed in that frame and filled in from the neighbors), every 4th grid row and column, and the
+red: failed in that frame and filled in from the neighbors), grid rows and columns about every 0.8 mm, and the
 stretches, the share of valid points and the match quality (ZNCC, 1 is a perfect match) of the frame
 shown. One slider moves all of them through their loading branch together; Play runs them. The
 preconditioning cycles (Def01–Def10), when tracked, are not shown, but their numbers are in
@@ -300,9 +300,12 @@ folder marks the steps already done; pick the others. A tracking step that was i
 
 `DIC_settings.m` holds the settings, each explained in the file: the steps, the thickness, the
 deformations, the DIC sizes (in mm), the limits of the tracking report and how often the tracking
-progress line is updated. The defaults suit these tests. `track_deformations` (Def11–Def19) and
-`export_deformations` (Def11–Def19) fill in the tracking and export windows; `deformations`
-(Def11–Def19) are the ones shown in the tracking report.
+progress line is updated. The defaults suit these tests. The grid step `step_mm` is 0.4 mm: on the tests
+tried, that halved the time of a test against 0.2 mm, changed the stretches by at most 0.003 and the
+stresses by at most 0.15%, and gave the same tracking verdicts; the artifact check then finds only
+artifacts about twice as large. Use the same value for every test of a study. `track_deformations`
+(Def11–Def19) and `export_deformations` (Def11–Def19) fill in the tracking and export windows;
+`deformations` (Def11–Def19) are the ones shown in the tracking report.
 
 `review_sort = false`, `review_tines = false`, `review_tracking = false`, `ask_thickness = false`,
 `ask_tracking = false` and `ask_export = false` turn off the sorting check, the tine-tip window, the

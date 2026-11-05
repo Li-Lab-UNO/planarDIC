@@ -4,7 +4,7 @@ function viewDeformation(testRoot, startName, startFrame)
 % startFrame choose the deformation and frame it opens at.
 %
 % Green dots are points tracked in that frame; red crosses are points that failed there and were filled
-% from their neighbors. The grid lines (every 4th row and column) show how the tissue deforms. The
+% from their neighbors. The grid lines (rows and columns about every 0.8 mm) show how the tissue deforms. The
 % stretches are those of the export (affine fit of all valid points, relative to the first image of
 % the reference deformation). It opens zoomed on the tine region; zoom and pan with the axes toolbar.
 % Drag the slider, or press Play.
@@ -17,7 +17,6 @@ names = regexprep({d.name}, '\.mat$', '');
 cfg = struct();
 if isfile(fullfile(testRoot, 'test_config.json')), cfg = util.readJSON(fullfile(testRoot, 'test_config.json')); end
 
-LINE_EVERY = 4;                                     % grid lines drawn every 4th row and column
 speeds = [1 2 5 10];                                % playback, times real time
 trk = []; k = 1; playing = false; imgDir = '';
 
@@ -53,7 +52,7 @@ info = uicontrol(fig, 'Style', 'text', 'Units', 'normalized', 'Position', [x0 0.
 uicontrol(fig, 'Style', 'text', 'Units', 'normalized', 'Position', [x0 0.04 w 0.24], 'FontSize', 10, ...
           'HorizontalAlignment', 'left', 'BackgroundColor', 'w', 'ForegroundColor', [0.35 0.35 0.35], 'String', { ...
           'Green dots: points tracked in this frame.', 'Red crosses: points that failed here and were filled from their neighbors.', ...
-          'Blue lines: every 4th grid row and column, deforming with the tissue.', 'Dashed: the tine-tip rectangle at rest.', '', ...
+          'Blue lines: grid rows and columns about every 0.8 mm, deforming with the tissue.', 'Dashed: the tine-tip rectangle at rest.', '', ...
           'Valid points should stay near 100%. A patch of red that persists, or grid lines that kink, marks a tracking problem.'});
 
 if isfield(cfg, 'tine_tips_px')
@@ -80,6 +79,7 @@ end
         playing = false; set(btnPlay, 'String', 'Play');
         name = names{get(popDef, 'Value')};
         trk = load(fullfile(testRoot, 'DIC_results', [name '.mat']));
+        if ~isfield(trk, 'step_mm'), trk.step_mm = NaN; end           % a track without it: every 4th row and column
         imgDir = fullfile(testRoot, 'Images', name);
         T = numel(trk.times);
         set(slider, 'Max', max(T, 2), 'Value', 1, 'SliderStep', [1, max(1, round(0.03 * (T - 1)))] / max(T - 1, 1), 'Enable', util.onOff(T > 1));
@@ -130,7 +130,7 @@ end
             set([hGood hBad], 'XData', NaN, 'YData', NaN);
         end
         if get(chkGrid, 'Value')
-            [gx, gy] = trackGridLines(x + 1, y + 1, trk.shape, LINE_EVERY);
+            [gx, gy] = trackGridLines(x + 1, y + 1, trk.shape, trk.step_mm);
             set(hGrid, 'XData', gx, 'YData', gy);
         else
             set(hGrid, 'XData', NaN, 'YData', NaN);
